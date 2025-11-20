@@ -7,7 +7,6 @@ function Sidebar({ isOpen = true }) {
 
   const navItems = [
     { path: '/dashboard', label: 'Dashboard', icon: '📊' },
-    { path: '/analytics', label: 'Analytics', icon: '📈' },
     { path: '/reports', label: 'Reports', icon: '📄' }
   ]
 

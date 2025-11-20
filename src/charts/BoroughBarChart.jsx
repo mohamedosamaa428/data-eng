@@ -1,23 +1,10 @@
-/**
- * BoroughBarChart Component
- * 
- * Research Question: Which boroughs have the highest number of crashes?
- * 
- * Filter Combinations:
- * - Borough: Filters to specific borough(s) - if selected, shows only that borough
- * - Year: Filters crashes by year range
- * - Vehicle Type: Filters by vehicle types involved
- * - Contributing Factor: Filters by contributing factors
- * - Injury Type: Filters by severity of injuries
- * 
- * Expected Data Format from Backend:
- * [
- *   { borough: string, count: number },
- *   ...
- * ]
- * 
- * Alternative field names supported: Borough, Count
- */
+/*
+
+  Research Question:
+
+  - Which borough has the highest number of collisions?
+
+*/
 
 import { useState, useEffect, useMemo } from 'react'
 import BasePlot from './BasePlot'
@@ -92,7 +79,7 @@ function BoroughBarChart({ data = [], title = 'Borough Bar Chart' }) {
   if (!data || data.length === 0 || plotlyData.length === 0) {
     return (
       <div className="w-full h-full min-h-[450px] flex items-center justify-center bg-white rounded-lg border border-gray-200">
-        <p className="text-gray-500 text-lg font-medium">No Data Available</p>
+        <p className="text-gray-500 text-lg font-medium">This visualization will update once data is provided.</p>
       </div>
     )
   }

@@ -1,37 +1,12 @@
-/**
- * CrashMap Component
- * 
- * Research Question: Where do crashes occur geographically, and what is their severity?
- * 
- * Filter Combinations:
- * - Borough: Filters crashes by specific borough(s) - affects map center and zoom
- * - Year: Filters crashes by year range
- * - Vehicle Type: Filters by vehicle types involved
- * - Contributing Factor: Filters by contributing factors
- * - Injury Type: Filters by severity of injuries (affects marker colors)
- * 
- * Expected Data Format from Backend:
- * [
- *   {
- *     latitude: number (40.0-41.0 for NYC),
- *     longitude: number (-75.0 to -73.0 for NYC),
- *     severity: number | string,
- *     borough: string,
- *     date: string,
- *     time: string,
- *     injuries: number
- *   },
- *   ...
- * ]
- * 
- * Alternative field names supported:
- * - Latitude, Longitude
- * - Severity, Borough
- * - Date, Crash_Date, Time, Crash_Time
- * - Injuries, Number_of_Injured
- * 
- * Invalid coordinates (outside NYC bounds) are automatically filtered out.
- */
+/*
+
+  Chart Type: Map Visualization
+
+  Research Question:
+
+  - Where are collision hotspots located across NYC?
+
+*/
 
 import { useState, useEffect, useMemo } from 'react'
 import BasePlot from './BasePlot'
@@ -188,7 +163,7 @@ function CrashMap({ data = [], title = 'Crash Map' }) {
   if (!data || data.length === 0 || plotlyData.length === 0) {
     return (
       <div className="w-full h-full min-h-[450px] flex items-center justify-center bg-white rounded-lg border border-gray-200">
-        <p className="text-gray-500 text-lg font-medium">No Data Available</p>
+        <p className="text-gray-500 text-lg font-medium">This visualization will update once data is provided.</p>
       </div>
     )
   }
