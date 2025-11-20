@@ -1,4 +1,5 @@
 import { Link, useLocation } from 'react-router-dom'
+import FiltersPanel from './FiltersPanel'
 
 function Sidebar({ isOpen = true }) {
   const location = useLocation()
@@ -11,8 +12,8 @@ function Sidebar({ isOpen = true }) {
   ]
 
   return (
-    <aside className="hidden lg:block w-64 bg-white border-r border-gray-200 min-h-[calc(100vh-4rem)]">
-      <div className="p-4">
+    <aside className="hidden lg:block w-72 xl:w-80 bg-white border-r border-gray-200 min-h-[calc(100vh-4rem)] flex flex-col">
+      <div className="p-4 flex-shrink-0">
         <h2 className="text-sm font-semibold text-gray-500 uppercase tracking-wider mb-4 px-3">
           Navigation
         </h2>
@@ -35,6 +36,11 @@ function Sidebar({ isOpen = true }) {
             )
           })}
         </nav>
+      </div>
+      
+      {/* Filters Panel - Below Reports Button */}
+      <div className="flex-1 overflow-y-auto border-t border-gray-200">
+        <FiltersPanel position="left" />
       </div>
     </aside>
   )
