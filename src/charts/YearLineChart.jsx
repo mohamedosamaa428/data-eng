@@ -1,24 +1,12 @@
-/**
- * YearLineChart Component
- * 
- * Research Question: How do crash trends change over time?
- * 
- * Filter Combinations:
- * - Year: Primary filter - determines the time range displayed
- * - Borough: Filters crashes by specific borough(s)
- * - Vehicle Type: Filters by vehicle types involved
- * - Contributing Factor: Filters by contributing factors
- * - Injury Type: Filters by severity of injuries
- * 
- * Expected Data Format from Backend:
- * [
- *   { date: string (YYYY-MM or YYYY-MM-DD), count: number },
- *   ...
- * ]
- * 
- * Alternative field names supported: Date, Count
- * Date format should be consistent (e.g., "2020-01", "2020-01-15")
- */
+/*
+
+  Chart Type: Line Chart
+
+  Research Question:
+
+  - How do collisions change month-by-month over the years?
+
+*/
 
 import { useState, useEffect, useMemo } from 'react'
 import BasePlot from './BasePlot'
@@ -101,7 +89,7 @@ function YearLineChart({ data = [], title = 'Year Line Chart' }) {
   if (!data || data.length === 0 || plotlyData.length === 0) {
     return (
       <div className="w-full h-full min-h-[450px] flex items-center justify-center bg-white rounded-lg border border-gray-200">
-        <p className="text-gray-500 text-lg font-medium">No Data Available</p>
+        <p className="text-gray-500 text-lg font-medium">This visualization will update once data is provided.</p>
       </div>
     )
   }

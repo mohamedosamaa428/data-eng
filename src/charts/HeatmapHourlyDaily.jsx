@@ -1,26 +1,12 @@
-/**
- * HeatmapHourlyDaily Component
- * 
- * Research Question: What are the peak hours and days for crashes?
- * 
- * Filter Combinations:
- * - Year: Filters crashes by year range
- * - Borough: Filters crashes by specific borough(s)
- * - Vehicle Type: Filters by vehicle types involved
- * - Contributing Factor: Filters by contributing factors
- * - Injury Type: Filters by severity of injuries
- * 
- * Expected Data Format from Backend:
- * [
- *   { hour: number (0-23), day: string ("Monday"-"Sunday"), count: number },
- *   ...
- * ]
- * 
- * Alternative field names supported: Hour, Day, Count
- * Day names are case-insensitive and matched to: Monday, Tuesday, Wednesday, Thursday, Friday, Saturday, Sunday
- * 
- * Data is aggregated into a 7x24 matrix (days × hours) with counts summed for overlapping entries.
- */
+/*
+
+  Chart Type: Heatmap
+
+  Research Question:
+
+  - At what hour and on what day of the week do collisions happen the most?
+
+*/
 
 import { useState, useEffect, useMemo } from 'react'
 import BasePlot from './BasePlot'
@@ -127,7 +113,7 @@ function HeatmapHourlyDaily({ data = [], title = 'Heatmap Hourly Daily' }) {
   if (!data || data.length === 0 || plotlyData.length === 0) {
     return (
       <div className="w-full h-full min-h-[450px] flex items-center justify-center bg-white rounded-lg border border-gray-200">
-        <p className="text-gray-500 text-lg font-medium">No Data Available</p>
+        <p className="text-gray-500 text-lg font-medium">This visualization will update once data is provided.</p>
       </div>
     )
   }
