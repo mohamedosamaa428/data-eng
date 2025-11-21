@@ -845,7 +845,7 @@ function VisualizationsPage() {
                 margin: { l: 80, r: 40, t: 60, b: 100 },
                 height: 400
               }}
-              config={{ displayModeBar: false, responsive: true }}
+              config={{ displayModeBar: true, responsive: true, displaylogo: false, modeBarButtonsToRemove: ['pan2d', 'lasso2d'] }}
               style={{ width: '100%', height: '100%' }}
             />
           </div>
@@ -862,11 +862,14 @@ function VisualizationsPage() {
               layout={{
                 title: 'Top 10 Contributing Factors to Collisions',
                 xaxis: { title: 'Number of Collisions' },
-                yaxis: { title: 'Contributing Factor' },
-                margin: { l: 80, r: 40, t: 60, b: 80 },
+                yaxis: { 
+                  title: 'Contributing Factor',
+                  automargin: true
+                },
+                margin: { l: 250, r: 40, t: 60, b: 80 },
                 height: 500
               }}
-              config={{ displayModeBar: false, responsive: true }}
+              config={{ displayModeBar: true, responsive: true, displaylogo: false, modeBarButtonsToRemove: ['pan2d', 'lasso2d'] }}
               style={{ width: '100%', height: '100%' }}
             />
           </div>
@@ -887,7 +890,7 @@ function VisualizationsPage() {
                 margin: { l: 80, r: 40, t: 60, b: 100 },
                 height: 400
               }}
-              config={{ displayModeBar: false, responsive: true }}
+              config={{ displayModeBar: true, responsive: true, displaylogo: false, modeBarButtonsToRemove: ['pan2d', 'lasso2d'] }}
               style={{ width: '100%', height: '100%' }}
             />
           </div>
@@ -908,7 +911,7 @@ function VisualizationsPage() {
                 margin: { l: 80, r: 40, t: 60, b: 80 },
                 height: 400
               }}
-              config={{ displayModeBar: false, responsive: true }}
+              config={{ displayModeBar: true, responsive: true, displaylogo: false, modeBarButtonsToRemove: ['pan2d', 'lasso2d'] }}
               style={{ width: '100%', height: '100%' }}
             />
           </div>
@@ -927,7 +930,7 @@ function VisualizationsPage() {
                 margin: { l: 40, r: 40, t: 60, b: 40 },
                 height: 500
               }}
-              config={{ displayModeBar: false, responsive: true }}
+              config={{ displayModeBar: true, responsive: true, displaylogo: false, modeBarButtonsToRemove: ['pan2d', 'lasso2d'] }}
               style={{ width: '100%', height: '100%' }}
             />
           </div>
@@ -946,7 +949,7 @@ function VisualizationsPage() {
                 margin: { l: 40, r: 40, t: 60, b: 40 },
                 height: 500
               }}
-              config={{ displayModeBar: false, responsive: true }}
+              config={{ displayModeBar: true, responsive: true, displaylogo: false, modeBarButtonsToRemove: ['pan2d', 'lasso2d'] }}
               style={{ width: '100%', height: '100%' }}
             />
           </div>
@@ -967,7 +970,7 @@ function VisualizationsPage() {
                 margin: { l: 100, r: 40, t: 60, b: 80 },
                 height: 500
               }}
-              config={{ displayModeBar: false, responsive: true }}
+              config={{ displayModeBar: true, responsive: true, displaylogo: false, modeBarButtonsToRemove: ['pan2d', 'lasso2d'] }}
               style={{ width: '100%', height: '100%' }}
             />
           </div>
@@ -985,13 +988,17 @@ function VisualizationsPage() {
                 title: 'Vehicle Type vs Contributing Factor Heatmap',
                 xaxis: { 
                   title: 'Contributing Factor',
-                  tickangle: -45
+                  tickangle: -45,
+                  automargin: true
                 },
-                yaxis: { title: 'Vehicle Type' },
-                margin: { l: 200, r: 40, t: 60, b: 200 },
+                yaxis: { 
+                  title: 'Vehicle Type',
+                  automargin: true
+                },
+                margin: { l: 250, r: 40, t: 60, b: 250 },
                 height: 700
               }}
-              config={{ displayModeBar: false, responsive: true }}
+              config={{ displayModeBar: true, responsive: true, displaylogo: false, modeBarButtonsToRemove: ['pan2d', 'lasso2d'] }}
               style={{ width: '100%', height: '100%' }}
             />
           </div>
