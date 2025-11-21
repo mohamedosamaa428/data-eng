@@ -14,7 +14,9 @@
   ],
   "functions": {
     "server.js": {
-      "includeFiles": "data/final_dataset.csv"
+      "includeFiles": "data/final_dataset.csv", 
+      "maxDuration": 60, 
+      "memory": 3008
     }
   }
 }

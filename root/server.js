@@ -10,19 +10,22 @@ const path = require("path");
 const app = express();
 app.use(cors());
 
-let df = [];
-
 app.get("/", (req, res) => {
   // This tells the user the API is running and guides them to the correct paths.
   res.send("API is running! Use /filters, /data, or /search to access data.");
 });
+
+let df = [];
+
+
 
 // ---------------------------------------
 // LOAD DATASET (.CSV) - using csv-parser
 // ---------------------------------------
 function loadDataset() {
   console.log("Loading CSV dataset...");
-  const filePath = path.join(process.cwd(), 'data', 'final_dataset.csv');
+  // Assuming the file is bundled directly into the function's root folder structure
+const filePath = path.join(__dirname, "data", "final_dataset.csv");
 
   fs.createReadStream(filePath)
     .pipe(csv())
