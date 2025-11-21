@@ -17,6 +17,7 @@ import CrashMap from '../charts/CrashMap'
 import CrashDensityMap from '../charts/CrashDensityMap'
 import BoroughHotspotRankingChart from '../charts/BoroughHotspotRankingChart'
 import BoroughInjuryFatalityBubbleChart from '../charts/BoroughInjuryFatalityBubbleChart'
+import SearchBar from '../components/SearchBar'
 
 const toNumber = (value) => {
   if (value === null || value === undefined || value === '') return undefined
@@ -36,6 +37,105 @@ const sampleArray = (array, limit) => {
   if (array.length <= limit) return array
   const step = Math.ceil(array.length / limit)
   return array.filter((_, idx) => idx % step === 0).slice(0, limit)
+}
+
+/**
+ * Parse natural language search query to extract filters
+ * @param {string} query - The search query string
+ * @returns {Object} Parsed filters object
+ */
+function parseSearchQuery(query) {
+  if (!query || typeof query !== 'string') {
+    return {
+      borough: undefined,
+      year: undefined,
+      vehicleType: undefined,
+      factor: undefined,
+      injuryType: undefined
+    }
+  }
+
+  const queryLower = query.toLowerCase().trim()
+  const result = {
+    borough: undefined,
+    year: undefined,
+    vehicleType: undefined,
+    factor: undefined,
+    injuryType: undefined
+  }
+
+  // Extract borough
+  const boroughs = [
+    { keywords: ['manhattan'], value: 'MANHATTAN' },
+    { keywords: ['brooklyn'], value: 'BROOKLYN' },
+    { keywords: ['queens'], value: 'QUEENS' },
+    { keywords: ['bronx'], value: 'BRONX' },
+    { keywords: ['staten island', 'staten'], value: 'STATEN ISLAND' }
+  ]
+  
+  for (const borough of boroughs) {
+    if (borough.keywords.some(keyword => queryLower.includes(keyword))) {
+      result.borough = borough.value
+      break
+    }
+  }
+
+  // Extract year (4-digit year)
+  const yearMatch = query.match(/\b(20\d{2}|19\d{2})\b/)
+  if (yearMatch) {
+    result.year = yearMatch[1]
+  }
+
+  // Extract vehicle type
+  const vehicleTypes = [
+    { keywords: ['sedan', 'car', 'passenger'], value: 'Sedan' },
+    { keywords: ['suv', 'sport utility', 'station wagon'], value: 'Sport Utility / Station Wagon' },
+    { keywords: ['taxi', 'cab'], value: 'Taxi' },
+    { keywords: ['bus', 'transit'], value: 'Bus' },
+    { keywords: ['bike', 'bicycle', 'cyclist'], value: 'Bike' },
+    { keywords: ['motorcycle', 'motorcyclist'], value: 'Motorcycle' },
+    { keywords: ['truck', 'pick-up', 'pickup'], value: 'Pick-up Truck' },
+    { keywords: ['box truck'], value: 'Box Truck' },
+    { keywords: ['ambulance'], value: 'Ambulance' },
+    { keywords: ['fire truck', 'firetruck'], value: 'Fire Truck' },
+    { keywords: ['pedestrian'], value: 'PEDESTRIAN' }
+  ]
+
+  for (const vehicle of vehicleTypes) {
+    if (vehicle.keywords.some(keyword => queryLower.includes(keyword))) {
+      result.vehicleType = vehicle.value
+      break
+    }
+  }
+
+  // Extract contributing factors
+  const factors = [
+    { keywords: ['distraction', 'distracted', 'inattention'], value: 'Driver Inattention/Distraction' },
+    { keywords: ['speeding', 'speed', 'unsafe speed'], value: 'Unsafe Speed' },
+    { keywords: ['alcohol', 'drunk', 'dwi', 'dui'], value: 'Alcohol Involvement' },
+    { keywords: ['failure to yield', 'yield'], value: 'Failure to Yield Right-of-Way' },
+    { keywords: ['following', 'tailgating', 'too closely'], value: 'Following Too Closely' },
+    { keywords: ['red light', 'red-light', 'traffic control'], value: 'Traffic Control Disregarded' },
+    { keywords: ['backing', 'backed'], value: 'Backing Unsafely' }
+  ]
+
+  for (const factor of factors) {
+    if (factor.keywords.some(keyword => queryLower.includes(keyword))) {
+      result.factor = factor.value
+      break
+    }
+  }
+
+  // Extract injury type
+  if (queryLower.includes('fatal') || queryLower.includes('fatality') || queryLower.includes('death') || queryLower.includes('killed')) {
+    result.injuryType = 'fatal'
+  } else if (queryLower.includes('injury') || queryLower.includes('injured') || queryLower.includes('hurt')) {
+    result.injuryType = 'injury'
+  } else if (queryLower.includes('pedestrian')) {
+    result.injuryType = 'pedestrian'
+  }
+
+  return result
 }
 
 const buildCrashMapData = (rows) => {
@@ -129,10 +229,14 @@ function VisualizationsPage() {
   const [filters, setFilters] = useState({
     borough: 'All Boroughs',
     year: 'All Years',
-    vehicleType: 'All Vehicles'
+    vehicleType: 'All Vehicles',
+    factor: 'All Factors',
+    injuryType: 'All Types'
   })
   const [filteredData, setFilteredData] = useState([])
   const [debugMode, setDebugMode] = useState(false)
+  const [searchQuery, setSearchQuery] = useState('')
+  const [isSearchMode, setIsSearchMode] = useState(false)
 
   /**
    * Validate data structure and required columns
@@ -312,12 +416,28 @@ function VisualizationsPage() {
     fetchData()
   }, [])
 
-  const handleGenerateReport = () => {
+  // Clear search mode when filters are manually changed via dropdowns
+  useEffect(() => {
+    if (isSearchMode && searchQuery) {
+      // If user manually changes filters, keep search mode but allow manual adjustments
+      // This allows users to refine search results
+    }
+  }, [filters, isSearchMode, searchQuery])
+
+  /**
+   * Apply filters to data and update filteredData state
+   * This function is used by both search mode and dropdown filtering
+   * @param {Object} filtersToApply - Optional filters object, defaults to current filters state
+   */
+  const applyFilters = (filtersToApply = null) => {
     if (!data || data.length === 0) {
       console.log('No data available to filter')
       setFilteredData([])
       return
     }
+
+    // Use provided filters or current state
+    const activeFilters = filtersToApply || filters
 
     // Start with a copy of all data
     let filtered = [...data]
@@ -325,55 +445,94 @@ function VisualizationsPage() {
 
     // Log applied filters
     console.group('🔍 Filtering Data')
-    console.log('Applied Filters:', {
-      borough: filters.borough,
-      year: filters.year,
-      vehicleType: filters.vehicleType
-    })
+    console.log('Applied Filters:', activeFilters)
     console.log('Original data length:', originalLength)
 
     // Apply borough filter
-    if (filters.borough !== 'All Boroughs') {
+    if (activeFilters.borough !== 'All Boroughs') {
       const beforeBorough = filtered.length
       filtered = filtered.filter(row => {
         const borough = row.BOROUGH || row['BOROUGH']
-        return borough === filters.borough
+        return borough === activeFilters.borough
       })
-      console.log(`Borough filter (${filters.borough}): ${beforeBorough} → ${filtered.length}`)
+      console.log(`Borough filter (${activeFilters.borough}): ${beforeBorough} → ${filtered.length}`)
     }
 
     // Apply year filter
-    if (filters.year !== 'All Years') {
+    if (activeFilters.year !== 'All Years') {
       const beforeYear = filtered.length
       filtered = filtered.filter(row => {
         const crashDate = row.CRASH_DATE || row['CRASH DATE']
         if (!crashDate) return false
 
-        // Parse CRASH_DATE to get year (format: MM/DD/YYYY)
+        // Parse CRASH_DATE to get year (format: MM/DD/YYYY or ISO format)
         let year = null
         if (typeof crashDate === 'string') {
+          // Try MM/DD/YYYY format first
           const dateParts = crashDate.split('/')
           if (dateParts.length >= 3) {
             year = dateParts[2]?.substring(0, 4)
+          } else {
+            // Try ISO format (YYYY-MM-DD)
+            const isoMatch = crashDate.match(/^(\d{4})/)
+            if (isoMatch) {
+              year = isoMatch[1]
+            }
           }
         } else if (crashDate instanceof Date) {
           year = String(crashDate.getFullYear())
         }
 
-        return String(year) === String(filters.year)
+        return String(year) === String(activeFilters.year)
       })
-      console.log(`Year filter (${filters.year}): ${beforeYear} → ${filtered.length}`)
+      console.log(`Year filter (${activeFilters.year}): ${beforeYear} → ${filtered.length}`)
     }
 
     // Apply vehicle type filter
-    if (filters.vehicleType !== 'All Vehicles') {
+    if (activeFilters.vehicleType !== 'All Vehicles') {
       const beforeVehicle = filtered.length
       filtered = filtered.filter(row => {
         const vehicle1 = row.VEHICLE_TYPE_CODE_1 || row['VEHICLE TYPE CODE 1']
         const vehicle2 = row.VEHICLE_TYPE_CODE_2 || row['VEHICLE TYPE CODE 2']
-        return vehicle1 === filters.vehicleType || vehicle2 === filters.vehicleType
+        return vehicle1 === activeFilters.vehicleType || vehicle2 === activeFilters.vehicleType
       })
-      console.log(`Vehicle type filter (${filters.vehicleType}): ${beforeVehicle} → ${filtered.length}`)
+      console.log(`Vehicle type filter (${activeFilters.vehicleType}): ${beforeVehicle} → ${filtered.length}`)
+    }
+
+    // Apply contributing factor filter
+    if (activeFilters.factor !== 'All Factors') {
+      const beforeFactor = filtered.length
+      filtered = filtered.filter(row => {
+        const factor1 = row.CONTRIBUTING_FACTOR_VEHICLE_1 || row['CONTRIBUTING FACTOR VEHICLE 1']
+        const factor2 = row.CONTRIBUTING_FACTOR_VEHICLE_2 || row['CONTRIBUTING FACTOR VEHICLE 2']
+        return factor1 === activeFilters.factor || factor2 === activeFilters.factor
+      })
+      console.log(`Factor filter (${activeFilters.factor}): ${beforeFactor} → ${filtered.length}`)
+    }
+
+    // Apply injury type filter
+    if (activeFilters.injuryType !== 'All Types') {
+      const beforeInjury = filtered.length
+      filtered = filtered.filter(row => {
+        const injured = toNumber(
+          row.NUMBER_OF_PERSONS_INJURED || row['NUMBER OF PERSONS INJURED']
+        ) || 0
+        const killed = toNumber(
+          row.NUMBER_OF_PERSONS_KILLED || row['NUMBER OF PERSONS KILLED']
+        ) || 0
+
+        if (activeFilters.injuryType === 'fatal') {
+          return killed > 0
+        } else if (activeFilters.injuryType === 'injury') {
+          return injured > 0
+        } else if (activeFilters.injuryType === 'pedestrian') {
+          // Check if pedestrian involved (simplified check)
+          const vehicle1 = (row.VEHICLE_TYPE_CODE_1 || row['VEHICLE TYPE CODE 1'] || '').toLowerCase()
+          return vehicle1.includes('pedestrian')
+        }
+        return true
+      })
+      console.log(`Injury type filter (${activeFilters.injuryType}): ${beforeInjury} → ${filtered.length}`)
     }
 
     // Set filtered data
@@ -385,8 +544,61 @@ function VisualizationsPage() {
     
     if (filtered.length === 0) {
       console.warn('No data matches these filters')
-      alert('No data matches these filters. Please adjust your selection.')
     }
+  }
+
+  /**
+   * Handle search query - parse and apply filters automatically
+   */
+  const handleSearch = () => {
+    if (!searchQuery.trim()) {
+      return
+    }
+
+    // Parse the search query
+    const parsed = parseSearchQuery(searchQuery)
+    console.log('🔍 Parsed search query:', parsed)
+
+    // Update filters with parsed values
+    const newFilters = {
+      borough: parsed.borough || 'All Boroughs',
+      year: parsed.year || 'All Years',
+      vehicleType: parsed.vehicleType || 'All Vehicles',
+      factor: parsed.factor || 'All Factors',
+      injuryType: parsed.injuryType || 'All Types'
+    }
+
+    setFilters(newFilters)
+    setIsSearchMode(true)
+
+    // Apply filters immediately with the new filters
+    setTimeout(() => {
+      applyFilters(newFilters)
+    }, 100)
+  }
+
+  /**
+   * Clear search and reset to default filters
+   */
+  const handleClearSearch = () => {
+    setSearchQuery('')
+    setIsSearchMode(false)
+    setFilters({
+      borough: 'All Boroughs',
+      year: 'All Years',
+      vehicleType: 'All Vehicles',
+      factor: 'All Factors',
+      injuryType: 'All Types'
+    })
+    setFilteredData([])
+  }
+
+  /**
+   * Handle Generate Report button click
+   * Works with both search mode and dropdown filtering
+   */
+  const handleGenerateReport = () => {
+    applyFilters()
   }
 
   // Use filteredData if it exists, otherwise use all data
@@ -490,9 +702,42 @@ function VisualizationsPage() {
           <p className="text-gray-600 text-sm">Data visualizations and analytics</p>
         </div>
         
+        {/* Search Bar */}
+        <div className="mb-6">
+          <SearchBar
+            value={searchQuery}
+            onChange={setSearchQuery}
+            onSearch={handleSearch}
+            onClear={handleClearSearch}
+            placeholder="Search: e.g., 'Brooklyn 2022 pedestrian crashes' or 'Queens taxi accidents 2021'"
+          />
+        </div>
+        
+        {/* Search Mode Indicator */}
+        {isSearchMode && (
+          <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center">
+                <svg className="h-5 w-5 text-blue-600 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+                <span className="text-sm font-medium text-blue-900">
+                  Search mode active: Filters updated from search query
+                </span>
+              </div>
+              <button
+                onClick={handleClearSearch}
+                className="text-sm text-blue-600 hover:text-blue-800 underline"
+              >
+                Clear search
+              </button>
+            </div>
+          </div>
+        )}
+
         {/* Filters Container */}
-        <div className="filters-container mb-8">
-          <label className="text-sm font-semibold text-gray-700">Filter Data:</label>
+        <div className="filters-container mb-8 flex flex-wrap items-center gap-3">
+          <label className="text-sm font-semibold text-gray-700 w-full md:w-auto">Filter Data:</label>
           
           {/* Borough Dropdown */}
           <select
@@ -544,6 +789,34 @@ function VisualizationsPage() {
             <option value="Box Truck">Box Truck</option>
             <option value="Ambulance">Ambulance</option>
             <option value="Fire Truck">Fire Truck</option>
+          </select>
+
+          {/* Contributing Factor Dropdown */}
+          <select
+            value={filters.factor}
+            onChange={(e) => setFilters({ ...filters, factor: e.target.value })}
+            className="px-4 py-2 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white text-gray-900 text-sm"
+          >
+            <option value="All Factors">All Factors</option>
+            <option value="Driver Inattention/Distraction">Driver Inattention/Distraction</option>
+            <option value="Unsafe Speed">Unsafe Speed</option>
+            <option value="Alcohol Involvement">Alcohol Involvement</option>
+            <option value="Failure to Yield Right-of-Way">Failure to Yield Right-of-Way</option>
+            <option value="Following Too Closely">Following Too Closely</option>
+            <option value="Traffic Control Disregarded">Traffic Control Disregarded</option>
+            <option value="Backing Unsafely">Backing Unsafely</option>
+          </select>
+
+          {/* Injury Type Dropdown */}
+          <select
+            value={filters.injuryType}
+            onChange={(e) => setFilters({ ...filters, injuryType: e.target.value })}
+            className="px-4 py-2 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white text-gray-900 text-sm"
+          >
+            <option value="All Types">All Types</option>
+            <option value="injury">Injury</option>
+            <option value="fatal">Fatal</option>
+            <option value="pedestrian">Pedestrian</option>
           </select>
 
           {/* Generate Report Button */}
