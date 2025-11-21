@@ -5,6 +5,7 @@ const cors = require("cors");
 const fs = require("fs");
 const csv = require("csv-parser");
 const parseQuery = require("./utils/searchParser");
+const path = require("path");
 
 const app = express();
 app.use(cors());
@@ -16,7 +17,7 @@ let df = [];
 // ---------------------------------------
 function loadDataset() {
   console.log("Loading CSV dataset...");
-  const filePath = "data/final_dataset.csv";
+  const filePath = path.join(process.cwd(), "root", "data", "final_dataset.csv");
 
   fs.createReadStream(filePath)
     .pipe(csv())
