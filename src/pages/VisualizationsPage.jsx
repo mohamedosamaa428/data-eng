@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import Papa from 'papaparse'
 import Plot from 'react-plotly.js'
 import {
@@ -13,6 +13,114 @@ import {
   processCollisionHotspots,
   processInjuryFatalityMap
 } from '../utils/dataProcessing'
+import CrashMap from '../charts/CrashMap'
+import CrashDensityMap from '../charts/CrashDensityMap'
+import BoroughHotspotRankingChart from '../charts/BoroughHotspotRankingChart'
+import BoroughInjuryFatalityBubbleChart from '../charts/BoroughInjuryFatalityBubbleChart'
+
+const toNumber = (value) => {
+  if (value === null || value === undefined || value === '') return undefined
+  const parsed = Number(value)
+  return Number.isFinite(parsed) ? parsed : undefined
+}
+
+const isValidCoordinate = (lat, lon) =>
+  typeof lat === 'number' &&
+  typeof lon === 'number' &&
+  lat >= 40 &&
+  lat <= 41 &&
+  lon >= -75 &&
+  lon <= -73
+
+const sampleArray = (array, limit) => {
+  if (array.length <= limit) return array
+  const step = Math.ceil(array.length / limit)
+  return array.filter((_, idx) => idx % step === 0).slice(0, limit)
+}
+
+const buildCrashMapData = (rows) => {
+  if (!rows || rows.length === 0) return []
+
+  const transformed = rows
+    .map((row) => {
+      const latitude =
+        toNumber(row.LATITUDE ?? row.latitude ?? row.Latitude ?? row.lat ?? row.Lat)
+      const longitude =
+        toNumber(row.LONGITUDE ?? row.longitude ?? row.Longitude ?? row.lon ?? row.Lon)
+
+      if (!isValidCoordinate(latitude, longitude)) return null
+
+      const injuries =
+        toNumber(
+          row.NUMBER_OF_PERSONS_INJURED ??
+            row['NUMBER OF PERSONS INJURED'] ??
+            row.injuries ??
+            row.Injuries
+        ) || 0
+      const killed =
+        toNumber(
+          row.NUMBER_OF_PERSONS_KILLED ??
+            row['NUMBER OF PERSONS KILLED'] ??
+            row.killed ??
+            row.Killed
+        ) || 0
+
+      let severity = 'Minor'
+      if (killed > 0) severity = 'Fatal'
+      else if (injuries > 0) severity = 'Injury'
+
+      return {
+        latitude,
+        longitude,
+        severity,
+        borough: row.BOROUGH ?? row['BOROUGH'] ?? 'Unknown',
+        date: row.CRASH_DATE ?? row['CRASH DATE'] ?? '',
+        time: row.CRASH_TIME ?? row['CRASH TIME'] ?? '',
+        injuries
+      }
+    })
+    .filter(Boolean)
+
+  return sampleArray(transformed, 10000)
+}
+
+const buildCrashDensityData = (rows) => {
+  if (!rows || rows.length === 0) return []
+
+  const transformed = rows
+    .map((row) => {
+      const latitude =
+        toNumber(row.LATITUDE ?? row.latitude ?? row.Latitude ?? row.lat ?? row.Lat)
+      const longitude =
+        toNumber(row.LONGITUDE ?? row.longitude ?? row.Longitude ?? row.lon ?? row.Lon)
+
+      if (!isValidCoordinate(latitude, longitude)) return null
+
+      const injuries =
+        toNumber(
+          row.NUMBER_OF_PERSONS_INJURED ??
+            row['NUMBER OF PERSONS INJURED'] ??
+            row.injuries ??
+            row.Injuries
+        ) || 0
+      const killed =
+        toNumber(
+          row.NUMBER_OF_PERSONS_KILLED ??
+            row['NUMBER OF PERSONS KILLED'] ??
+            row.killed ??
+            row.Killed
+        ) || 0
+
+      return {
+        latitude,
+        longitude,
+        density: injuries + killed * 10
+      }
+    })
+    .filter(Boolean)
+
+  return sampleArray(transformed, 10000)
+}
 
 function VisualizationsPage() {
   const [data, setData] = useState([])
@@ -284,6 +392,55 @@ function VisualizationsPage() {
   // Use filteredData if it exists, otherwise use all data
   const displayData = filteredData.length > 0 ? filteredData : data
 
+  const crashMapData = useMemo(() => buildCrashMapData(displayData), [displayData])
+  const crashDensityData = useMemo(() => buildCrashDensityData(displayData), [displayData])
+  
+  // Process borough hotspot data for Q9 bar chart
+  const boroughHotspotData = useMemo(() => {
+    const boroughData = processBoroughCollisions(displayData)
+    if (!boroughData || !boroughData.x || !boroughData.y) return []
+    
+    return boroughData.x.map((borough, idx) => ({
+      borough: borough,
+      count: boroughData.y[idx] || 0
+    }))
+  }, [displayData])
+
+  // Process borough injury/fatality data for Q10 bubble chart
+  const boroughInjuryFatalityData = useMemo(() => {
+    if (!displayData || displayData.length === 0) return []
+    
+    const boroughStats = {}
+    
+    displayData.forEach(row => {
+      const borough = row.BOROUGH ?? row['BOROUGH'] ?? null
+      if (!borough) return
+      
+      const injuries = toNumber(
+        row.NUMBER_OF_PERSONS_INJURED ??
+        row['NUMBER OF PERSONS INJURED'] ??
+        row.injuries ??
+        row.Injuries
+      ) || 0
+      
+      const fatalities = toNumber(
+        row.NUMBER_OF_PERSONS_KILLED ??
+        row['NUMBER OF PERSONS KILLED'] ??
+        row.killed ??
+        row.Killed
+      ) || 0
+      
+      if (!boroughStats[borough]) {
+        boroughStats[borough] = { borough, injuries: 0, fatalities: 0 }
+      }
+      
+      boroughStats[borough].injuries += injuries
+      boroughStats[borough].fatalities += fatalities
+    })
+    
+    return Object.values(boroughStats).filter(item => item.injuries > 0 || item.fatalities > 0)
+  }, [displayData])
+
   // Loading state
   if (loading) {
     return (
@@ -454,7 +611,9 @@ function VisualizationsPage() {
           {/* QUESTION 1 (Bar Chart) */}
           <div className="question-section bg-white rounded-xl shadow-sm border border-gray-200 p-6 hover:shadow-md transition-shadow duration-200">
             <h2 className="text-2xl font-bold text-gray-900 mb-2">Research Question 1</h2>
-            <h4 className="text-sm text-gray-600 mb-4">Team Member: [Name]</h4>
+            <div className="mb-2">
+              <span className="text-xs font-semibold text-blue-600 uppercase tracking-wide">Bar Chart</span>
+            </div>
             <h3 className="text-xl font-semibold text-gray-800 mb-6">Which borough has the highest number of collisions?</h3>
             <Plot
               data={[processBoroughCollisions(displayData)]}
@@ -462,6 +621,7 @@ function VisualizationsPage() {
                 title: 'Total Collisions by Borough',
                 xaxis: { title: 'Borough' },
                 yaxis: { title: 'Number of Collisions' },
+                margin: { l: 80, r: 40, t: 60, b: 100 },
                 height: 400
               }}
               config={{ displayModeBar: false, responsive: true }}
@@ -476,7 +636,9 @@ function VisualizationsPage() {
           {/* QUESTION 2 (Bar Chart) */}
           <div className="question-section bg-white rounded-xl shadow-sm border border-gray-200 p-6 hover:shadow-md transition-shadow duration-200">
             <h2 className="text-2xl font-bold text-gray-900 mb-2">Research Question 2</h2>
-            <h4 className="text-sm text-gray-600 mb-4">Team Member: [Name]</h4>
+            <div className="mb-2">
+              <span className="text-xs font-semibold text-blue-600 uppercase tracking-wide">Bar Chart</span>
+            </div>
             <h3 className="text-xl font-semibold text-gray-800 mb-6">What are the top 10 contributing factors that cause collisions?</h3>
             <Plot
               data={[processTopContributingFactors(displayData)]}
@@ -484,6 +646,7 @@ function VisualizationsPage() {
                 title: 'Top 10 Contributing Factors to Collisions',
                 xaxis: { title: 'Number of Collisions' },
                 yaxis: { title: 'Contributing Factor' },
+                margin: { l: 80, r: 40, t: 60, b: 80 },
                 height: 500
               }}
               config={{ displayModeBar: false, responsive: true }}
@@ -498,7 +661,9 @@ function VisualizationsPage() {
           {/* QUESTION 3 (Line Chart) */}
           <div className="question-section bg-white rounded-xl shadow-sm border border-gray-200 p-6 hover:shadow-md transition-shadow duration-200">
             <h2 className="text-2xl font-bold text-gray-900 mb-2">Research Question 3</h2>
-            <h4 className="text-sm text-gray-600 mb-4">Team Member: [Name]</h4>
+            <div className="mb-2">
+              <span className="text-xs font-semibold text-blue-600 uppercase tracking-wide">Line Chart</span>
+            </div>
             <h3 className="text-xl font-semibold text-gray-800 mb-6">How do collisions change month-by-month over the years?</h3>
             <Plot
               data={[processMonthlyTrend(displayData)]}
@@ -506,6 +671,7 @@ function VisualizationsPage() {
                 title: 'Monthly Collision Trends Over Time',
                 xaxis: { title: 'Month-Year' },
                 yaxis: { title: 'Number of Collisions' },
+                margin: { l: 80, r: 40, t: 60, b: 100 },
                 height: 400
               }}
               config={{ displayModeBar: false, responsive: true }}
@@ -520,7 +686,9 @@ function VisualizationsPage() {
           {/* QUESTION 4 (Line Chart) */}
           <div className="question-section bg-white rounded-xl shadow-sm border border-gray-200 p-6 hover:shadow-md transition-shadow duration-200">
             <h2 className="text-2xl font-bold text-gray-900 mb-2">Research Question 4</h2>
-            <h4 className="text-sm text-gray-600 mb-4">Team Member: [Name]</h4>
+            <div className="mb-2">
+              <span className="text-xs font-semibold text-blue-600 uppercase tracking-wide">Line Chart</span>
+            </div>
             <h3 className="text-xl font-semibold text-gray-800 mb-6">How do collisions change during the hours of the day?</h3>
             <Plot
               data={[processHourlyTrend(displayData)]}
@@ -528,6 +696,7 @@ function VisualizationsPage() {
                 title: 'Collisions Throughout the Day',
                 xaxis: { title: 'Hour of Day (0-23)' },
                 yaxis: { title: 'Number of Collisions' },
+                margin: { l: 80, r: 40, t: 60, b: 80 },
                 height: 400
               }}
               config={{ displayModeBar: false, responsive: true }}
@@ -542,12 +711,15 @@ function VisualizationsPage() {
           {/* QUESTION 5 (Pie Chart) */}
           <div className="question-section bg-white rounded-xl shadow-sm border border-gray-200 p-6 hover:shadow-md transition-shadow duration-200">
             <h2 className="text-2xl font-bold text-gray-900 mb-2">Research Question 5</h2>
-            <h4 className="text-sm text-gray-600 mb-4">Team Member: [Name]</h4>
+            <div className="mb-2">
+              <span className="text-xs font-semibold text-blue-600 uppercase tracking-wide">Pie Chart</span>
+            </div>
             <h3 className="text-xl font-semibold text-gray-800 mb-6">What percentage of collisions involve each type of vehicle?</h3>
             <Plot
               data={[processVehicleTypeDistribution(displayData)]}
               layout={{
                 title: 'Vehicle Type Distribution in Collisions',
+                margin: { l: 40, r: 40, t: 60, b: 40 },
                 height: 500
               }}
               config={{ displayModeBar: false, responsive: true }}
@@ -562,12 +734,15 @@ function VisualizationsPage() {
           {/* QUESTION 6 (Pie Chart) */}
           <div className="question-section bg-white rounded-xl shadow-sm border border-gray-200 p-6 hover:shadow-md transition-shadow duration-200">
             <h2 className="text-2xl font-bold text-gray-900 mb-2">Research Question 6</h2>
-            <h4 className="text-sm text-gray-600 mb-4">Team Member: [Name]</h4>
+            <div className="mb-2">
+              <span className="text-xs font-semibold text-blue-600 uppercase tracking-wide">Pie Chart</span>
+            </div>
             <h3 className="text-xl font-semibold text-gray-800 mb-6">What share does each borough contribute to total collisions?</h3>
             <Plot
               data={[processBoroughDistribution(displayData)]}
               layout={{
                 title: 'Borough Share of Total Collisions',
+                margin: { l: 40, r: 40, t: 60, b: 40 },
                 height: 500
               }}
               config={{ displayModeBar: false, responsive: true }}
@@ -582,7 +757,9 @@ function VisualizationsPage() {
           {/* QUESTION 7 (Heatmap) */}
           <div className="question-section bg-white rounded-xl shadow-sm border border-gray-200 p-6 hover:shadow-md transition-shadow duration-200">
             <h2 className="text-2xl font-bold text-gray-900 mb-2">Research Question 7</h2>
-            <h4 className="text-sm text-gray-600 mb-4">Team Member: [Name]</h4>
+            <div className="mb-2">
+              <span className="text-xs font-semibold text-blue-600 uppercase tracking-wide">Heatmap</span>
+            </div>
             <h3 className="text-xl font-semibold text-gray-800 mb-6">At what hour and on what day of the week do collisions happen the most?</h3>
             <Plot
               data={[processHourDayHeatmap(displayData)]}
@@ -590,6 +767,7 @@ function VisualizationsPage() {
                 title: 'Collision Heatmap: Day of Week vs Hour',
                 xaxis: { title: 'Hour of Day' },
                 yaxis: { title: 'Day of Week' },
+                margin: { l: 100, r: 40, t: 60, b: 80 },
                 height: 500
               }}
               config={{ displayModeBar: false, responsive: true }}
@@ -604,15 +782,21 @@ function VisualizationsPage() {
           {/* QUESTION 8 (Heatmap) */}
           <div className="question-section bg-white rounded-xl shadow-sm border border-gray-200 p-6 hover:shadow-md transition-shadow duration-200">
             <h2 className="text-2xl font-bold text-gray-900 mb-2">Research Question 8</h2>
-            <h4 className="text-sm text-gray-600 mb-4">Team Member: [Name]</h4>
+            <div className="mb-2">
+              <span className="text-xs font-semibold text-blue-600 uppercase tracking-wide">Heatmap</span>
+            </div>
             <h3 className="text-xl font-semibold text-gray-800 mb-6">Which combinations of vehicle type and contributing factor appear together most often?</h3>
             <Plot
               data={[processVehicleFactorHeatmap(displayData)]}
               layout={{
                 title: 'Vehicle Type vs Contributing Factor Heatmap',
-                xaxis: { title: 'Contributing Factor' },
+                xaxis: { 
+                  title: 'Contributing Factor',
+                  tickangle: -45
+                },
                 yaxis: { title: 'Vehicle Type' },
-                height: 600
+                margin: { l: 200, r: 40, t: 60, b: 200 },
+                height: 700
               }}
               config={{ displayModeBar: false, responsive: true }}
               style={{ width: '100%', height: '100%' }}
@@ -623,52 +807,28 @@ function VisualizationsPage() {
             </div>
           </div>
 
-          {/* QUESTION 9 (Map) */}
+          {/* QUESTION 9 (Bar Chart) */}
           <div className="question-section bg-white rounded-xl shadow-sm border border-gray-200 p-6 hover:shadow-md transition-shadow duration-200">
             <h2 className="text-2xl font-bold text-gray-900 mb-2">Research Question 9</h2>
-            <h4 className="text-sm text-gray-600 mb-4">Team Member: [Name]</h4>
+            <div className="mb-2">
+              <span className="text-xs font-semibold text-blue-600 uppercase tracking-wide">Bar Chart</span>
+            </div>
             <h3 className="text-xl font-semibold text-gray-800 mb-6">Where are collision hotspots located across NYC?</h3>
-            <Plot
-              data={[processCollisionHotspots(displayData)]}
-              layout={{
-                title: 'NYC Collision Hotspots',
-                mapbox: { 
-                  style: 'open-street-map',
-                  center: { lat: 40.7128, lon: -74.0060 },
-                  zoom: 10
-                },
-                height: 600,
-                margin: { l: 0, r: 0, t: 40, b: 0 }
-              }}
-              config={{ displayModeBar: false, responsive: true }}
-              style={{ width: '100%', height: '100%' }}
-            />
+            <BoroughHotspotRankingChart data={boroughHotspotData} title="Collision Hotspot Ranking Across NYC" />
             <div className="findings mt-6 pt-6 border-t border-gray-200">
               <h3 className="text-lg font-semibold text-gray-900 mb-2">Key Findings:</h3>
               <p className="text-gray-700">Analysis reveals collision hotspots...</p>
             </div>
           </div>
 
-          {/* QUESTION 10 (Map) */}
+          {/* QUESTION 10 (Bubble Chart) */}
           <div className="question-section bg-white rounded-xl shadow-sm border border-gray-200 p-6 hover:shadow-md transition-shadow duration-200">
             <h2 className="text-2xl font-bold text-gray-900 mb-2">Research Question 10</h2>
-            <h4 className="text-sm text-gray-600 mb-4">Team Member: [Name]</h4>
+            <div className="mb-2">
+              <span className="text-xs font-semibold text-blue-600 uppercase tracking-wide">Bubble Chart</span>
+            </div>
             <h3 className="text-xl font-semibold text-gray-800 mb-6">Which boroughs have the highest injury and fatality locations?</h3>
-            <Plot
-              data={[processInjuryFatalityMap(displayData)]}
-              layout={{
-                title: 'Injury and Fatality Hotspots by Borough',
-                mapbox: { 
-                  style: 'open-street-map',
-                  center: { lat: 40.7128, lon: -74.0060 },
-                  zoom: 10
-                },
-                height: 600,
-                margin: { l: 0, r: 0, t: 40, b: 0 }
-              }}
-              config={{ displayModeBar: false, responsive: true }}
-              style={{ width: '100%', height: '100%' }}
-            />
+            <BoroughInjuryFatalityBubbleChart data={boroughInjuryFatalityData} title="Borough Injury and Fatality Severity" />
             <div className="findings mt-6 pt-6 border-t border-gray-200">
               <h3 className="text-lg font-semibold text-gray-900 mb-2">Key Findings:</h3>
               <p className="text-gray-700">Analysis reveals injury and fatality hotspots...</p>

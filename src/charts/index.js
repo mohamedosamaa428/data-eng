@@ -8,4 +8,6 @@ export { default as HourlyTrendLineChart } from "./HourlyTrendLineChart";
 export { default as InjurySeverityPieChart } from "./InjurySeverityPieChart";
 export { default as MonthlyBoroughHeatmap } from "./MonthlyBoroughHeatmap";
 export { default as CrashDensityMap } from "./CrashDensityMap";
+export { default as BoroughHotspotRankingChart } from "./BoroughHotspotRankingChart";
+export { default as BoroughInjuryFatalityBubbleChart } from "./BoroughInjuryFatalityBubbleChart";
 

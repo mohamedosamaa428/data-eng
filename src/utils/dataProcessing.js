@@ -12,7 +12,73 @@
  * @returns {*} The column value or undefined if not found
  */
 function getColumnValue(row, underscoreName, spaceName) {
-  return row[underscoreName] !== undefined ? row[underscoreName] : row[spaceName]
+  if (!row || typeof row !== 'object') return undefined
+
+  if (underscoreName && row[underscoreName] !== undefined) {
+    return row[underscoreName]
+  }
+
+  if (spaceName && row[spaceName] !== undefined) {
+    return row[spaceName]
+  }
+
+  const targetNames = [underscoreName, spaceName]
+    .filter(Boolean)
+    .map((name) => name.toString().toLowerCase())
+
+  if (targetNames.length === 0) return undefined
+
+  for (const key of Object.keys(row)) {
+    if (targetNames.includes(key.toLowerCase())) {
+      return row[key]
+    }
+  }
+
+  return undefined
+}
+
+/**
+ * Helper to parse crash date values regardless of format
+ * Supports ISO strings, MM/DD/YYYY, Date objects
+ */
+function parseDateValue(value) {
+  if (!value) return null
+
+  if (value instanceof Date && !Number.isNaN(value.getTime())) {
+    return value
+  }
+
+  if (typeof value === 'string') {
+    const trimmed = value.trim()
+    if (!trimmed) return null
+
+    const isoDate = new Date(trimmed)
+    if (!Number.isNaN(isoDate.getTime())) {
+      return isoDate
+    }
+
+    if (trimmed.includes('/')) {
+      const parts = trimmed.split('/')
+      if (parts.length >= 3) {
+        const month = parseInt(parts[0], 10) - 1
+        const day = parseInt(parts[1], 10)
+        const year = parseInt(parts[2], 10)
+        const fallbackDate = new Date(year, month, day)
+        if (!Number.isNaN(fallbackDate.getTime())) {
+          return fallbackDate
+        }
+      }
+    }
+  }
+
+  return null
+}
+
+function toNumber(value) {
+  if (value === null || value === undefined || value === '') return undefined
+  if (typeof value === 'number' && Number.isFinite(value)) return value
+  const parsed = Number(value)
+  return Number.isFinite(parsed) ? parsed : undefined
 }
 
 /**
@@ -135,32 +201,16 @@ export function processMonthlyTrend(data) {
   // Group by year-month using reduce
   const monthlyCounts = data.reduce((acc, row) => {
     const crashDate = getColumnValue(row, 'CRASH_DATE', 'CRASH DATE')
-    if (!crashDate || crashDate === null || crashDate === undefined) {
+    const dateObj = parseDateValue(crashDate)
+
+    if (!dateObj) {
       return acc
     }
 
-    let monthYear = null
-
-    // Parse date format: "MM/DD/YYYY"
-    if (typeof crashDate === 'string') {
-      const dateParts = crashDate.split('/')
-      if (dateParts.length >= 3) {
-        const month = parseInt(dateParts[0], 10)
-        const year = parseInt(dateParts[2], 10)
-        if (month >= 1 && month <= 12 && year) {
-          monthYear = `${year}-${String(month).padStart(2, '0')}`
-        }
-      }
-    } else if (crashDate instanceof Date) {
-      // Handle Date objects
-      const year = crashDate.getFullYear()
-      const month = crashDate.getMonth() + 1
-      monthYear = `${year}-${String(month).padStart(2, '0')}`
-    }
-
-    if (monthYear) {
-      acc[monthYear] = (acc[monthYear] || 0) + 1
-    }
+    const year = dateObj.getFullYear()
+    const month = dateObj.getMonth() + 1
+    const monthYear = `${year}-${String(month).padStart(2, '0')}`
+    acc[monthYear] = (acc[monthYear] || 0) + 1
     return acc
   }, {})
 
@@ -352,23 +402,11 @@ export function processHourDayHeatmap(data) {
 
     if (!crashDate || !crashTime) return
 
-    // Parse day of week from CRASH_DATE
-    let dayIndex = null
-    if (typeof crashDate === 'string') {
-      const dateParts = crashDate.split('/')
-      if (dateParts.length >= 3) {
-        const month = parseInt(dateParts[0], 10) - 1 // Month is 0-indexed in Date
-        const day = parseInt(dateParts[1], 10)
-        const year = parseInt(dateParts[2], 10)
-        const date = new Date(year, month, day)
-        dayIndex = date.getDay() // 0 = Sunday, 1 = Monday, ..., 6 = Saturday
-        // Convert to Monday-first (0 = Monday, 6 = Sunday)
-        dayIndex = (dayIndex + 6) % 7
-      }
-    } else if (crashDate instanceof Date) {
-      dayIndex = crashDate.getDay()
-      dayIndex = (dayIndex + 6) % 7
-    }
+    const dateObj = parseDateValue(crashDate)
+    if (!dateObj) return
+
+    let dayIndex = dateObj.getDay()
+    dayIndex = (dayIndex + 6) % 7
 
     // Parse hour from CRASH_TIME
     let hour = null
@@ -499,14 +537,17 @@ export function processCollisionHotspots(data) {
   // Filter valid coordinates (NYC area: lat 40-41, lon -74 to -73)
   const validLocations = []
   data.forEach(row => {
-    const lat = getColumnValue(row, 'LATITUDE', 'LATITUDE')
-    const lon = getColumnValue(row, 'LONGITUDE', 'LONGITUDE')
+    const latRaw = getColumnValue(row, 'LATITUDE', 'LATITUDE')
+    const lonRaw = getColumnValue(row, 'LONGITUDE', 'LONGITUDE')
+    const lat = toNumber(latRaw)
+    const lon = toNumber(lonRaw)
 
-    if (lat && lon && 
-        typeof lat === 'number' && typeof lon === 'number' &&
-        !isNaN(lat) && !isNaN(lon) &&
-        lat >= 40 && lat <= 41 && 
-        lon >= -74 && lon <= -73) {
+    if (
+      lat !== undefined &&
+      lon !== undefined &&
+      lat >= 40 && lat <= 41 &&
+      lon >= -74 && lon <= -73
+    ) {
       validLocations.push({ lat, lon })
     }
   })
@@ -547,20 +588,25 @@ export function processInjuryFatalityMap(data) {
   // Filter valid coordinates and where injuries/deaths > 0
   const validLocations = []
   data.forEach(row => {
-    const lat = getColumnValue(row, 'LATITUDE', 'LATITUDE')
-    const lon = getColumnValue(row, 'LONGITUDE', 'LONGITUDE')
-    const injured = getColumnValue(row, 'NUMBER_OF_PERSONS_INJURED', 'NUMBER OF PERSONS INJURED') || 0
-    const killed = getColumnValue(row, 'NUMBER_OF_PERSONS_KILLED', 'NUMBER OF PERSONS KILLED') || 0
+    const latRaw = getColumnValue(row, 'LATITUDE', 'LATITUDE')
+    const lonRaw = getColumnValue(row, 'LONGITUDE', 'LONGITUDE')
+    const injuredRaw = getColumnValue(row, 'NUMBER_OF_PERSONS_INJURED', 'NUMBER OF PERSONS INJURED') || 0
+    const killedRaw = getColumnValue(row, 'NUMBER_OF_PERSONS_KILLED', 'NUMBER OF PERSONS KILLED') || 0
 
-    if (lat && lon && 
-        typeof lat === 'number' && typeof lon === 'number' &&
-        !isNaN(lat) && !isNaN(lon) &&
-        lat >= 40 && lat <= 41 && 
-        lon >= -74 && lon <= -73 &&
-        (injured > 0 || killed > 0)) {
-      // Calculate severity: injuries + (deaths * 10 for emphasis)
+    const lat = toNumber(latRaw)
+    const lon = toNumber(lonRaw)
+    const injured = toNumber(injuredRaw) || 0
+    const killed = toNumber(killedRaw) || 0
+
+    if (
+      lat !== undefined &&
+      lon !== undefined &&
+      lat >= 40 && lat <= 41 &&
+      lon >= -74 && lon <= -73 &&
+      (injured > 0 || killed > 0)
+    ) {
       const severity = Number(injured) + (Number(killed) * 10)
-      validLocations.push({ lat, lon, severity })
+      validLocations.push({ lat, lon, severity, injured, killed })
     }
   })
 
@@ -579,16 +625,7 @@ export function processInjuryFatalityMap(data) {
   })
 
   // Create hover text with injury/fatality info
-  const text = sampledLocations.map(loc => {
-    const row = data.find(r => {
-      const rLat = getColumnValue(r, 'LATITUDE', 'LATITUDE')
-      const rLon = getColumnValue(r, 'LONGITUDE', 'LONGITUDE')
-      return rLat === loc.lat && rLon === loc.lon
-    })
-    const injured = row ? (getColumnValue(row, 'NUMBER_OF_PERSONS_INJURED', 'NUMBER OF PERSONS INJURED') || 0) : 0
-    const killed = row ? (getColumnValue(row, 'NUMBER_OF_PERSONS_KILLED', 'NUMBER OF PERSONS KILLED') || 0) : 0
-    return `Injured: ${injured}, Killed: ${killed}`
-  })
+  const text = sampledLocations.map(loc => `Injured: ${loc.injured}, Killed: ${loc.killed}`)
 
   return {
     lat: sampledLocations.map(loc => loc.lat),

@@ -11,6 +11,11 @@
 import { useState, useEffect, useMemo } from 'react'
 import BasePlot from './BasePlot'
 
+const MAPBOX_TOKEN =
+  (typeof import.meta !== 'undefined' && import.meta.env && import.meta.env.VITE_MAPBOX_TOKEN) ||
+  (typeof process !== 'undefined' && process.env && process.env.VITE_MAPBOX_TOKEN) ||
+  'pk.eyJ1IjoibWFwYm94IiwiYSI6ImNpejY4NXVycTA2emYycXBndjJ6b3Z3N3gifQ.tCP2II7uXx1JrcI4tyoLJQ'
+
 function CrashMap({ data = [], title = 'Crash Map' }) {
   const [plotlyData, setPlotlyData] = useState([])
   const [layout, setLayout] = useState({})
@@ -49,28 +54,35 @@ function CrashMap({ data = [], title = 'Crash Map' }) {
     const timer = setTimeout(() => {
       // Filter and process data - remove invalid coordinates
       const processedData = data
-        .filter(item => {
-          const lat = item.latitude || item.Latitude
-          const lon = item.longitude || item.Longitude
-          // Validate coordinates (NYC bounds approximately: lat 40.4-40.9, lon -74.3 to -73.7)
-          return (
-            lat != null && 
-            lon != null && 
-            !isNaN(lat) && 
-            !isNaN(lon) &&
-            lat >= 40.0 && lat <= 41.0 &&
-            lon >= -75.0 && lon <= -73.0
-          )
+        .map(item => {
+          const lat = Number(item.latitude ?? item.Latitude)
+          const lon = Number(item.longitude ?? item.Longitude)
+          if (
+            Number.isNaN(lat) ||
+            Number.isNaN(lon) ||
+            lat < 40 ||
+            lat > 41 ||
+            lon < -75 ||
+            lon > -73
+          ) {
+            return null
+          }
+
+          return {
+            latitude: lat,
+            longitude: lon,
+            severity: item.severity || item.Severity || 'Unknown',
+            borough: item.borough || item.Borough || 'Unknown',
+            date: item.date || item.Date || item.crash_date || item.Crash_Date || 'Unknown',
+            time: item.time || item.Time || item.crash_time || item.Crash_Time || 'Unknown',
+            injuries:
+              Number(item.injuries ||
+                item.Injuries ||
+                item.number_of_injured ||
+                item.Number_of_Injured) || 0
+          }
         })
-        .map(item => ({
-          latitude: item.latitude || item.Latitude,
-          longitude: item.longitude || item.Longitude,
-          severity: item.severity || item.Severity || 'Unknown',
-          borough: item.borough || item.Borough || 'Unknown',
-          date: item.date || item.Date || item.crash_date || item.Crash_Date || 'Unknown',
-          time: item.time || item.Time || item.crash_time || item.Crash_Time || 'Unknown',
-          injuries: item.injuries || item.Injuries || item.number_of_injured || item.Number_of_Injured || 0
-        }))
+        .filter(Boolean)
 
       if (processedData.length === 0) {
         setPlotlyData([])
@@ -132,6 +144,7 @@ function CrashMap({ data = [], title = 'Crash Map' }) {
       const newLayout = {
         mapbox: {
           style: 'open-street-map',
+          accesstoken: MAPBOX_TOKEN,
           center: {
             lat: centerLat,
             lon: centerLon
@@ -177,6 +190,7 @@ function CrashMap({ data = [], title = 'Crash Map' }) {
         title={title}
         data={plotlyData}
         layout={layout}
+        config={{ mapboxAccessToken: MAPBOX_TOKEN }}
       />
     </div>
   )
