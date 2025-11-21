@@ -234,7 +234,6 @@ function VisualizationsPage() {
     injuryType: 'All Types'
   })
   const [filteredData, setFilteredData] = useState([])
-  const [debugMode, setDebugMode] = useState(false)
   const [searchQuery, setSearchQuery] = useState('')
   const [isSearchMode, setIsSearchMode] = useState(false)
 
@@ -826,58 +825,7 @@ function VisualizationsPage() {
           >
             Generate Report
           </button>
-
-          {/* Debug Mode Toggle */}
-          <button
-            onClick={() => setDebugMode(!debugMode)}
-            className={`px-4 py-2 text-sm font-medium rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-offset-2 transition-colors duration-200 cursor-pointer ${
-              debugMode
-                ? 'bg-green-600 text-white hover:bg-green-700 focus:ring-green-500'
-                : 'bg-gray-200 text-gray-700 hover:bg-gray-300 focus:ring-gray-500'
-            }`}
-          >
-            {debugMode ? '🔍 Debug ON' : '🔍 Debug OFF'}
-          </button>
         </div>
-
-        {/* Debug Statistics Panel */}
-        {debugMode && (
-          <div className="mb-8 p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
-            <h3 className="text-lg font-semibold text-yellow-900 mb-3">📊 Debug Statistics</h3>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
-              <div>
-                <strong>Total Data Rows:</strong> {data.length.toLocaleString()}
-              </div>
-              <div>
-                <strong>Filtered Data Rows:</strong> {filteredData.length > 0 ? filteredData.length.toLocaleString() : 'None (showing all)'}
-              </div>
-              <div>
-                <strong>Display Data Rows:</strong> {displayData.length.toLocaleString()}
-              </div>
-              <div>
-                <strong>Active Filters:</strong> {
-                  [
-                    filters.borough !== 'All Boroughs' ? `Borough: ${filters.borough}` : null,
-                    filters.year !== 'All Years' ? `Year: ${filters.year}` : null,
-                    filters.vehicleType !== 'All Vehicles' ? `Vehicle: ${filters.vehicleType}` : null
-                  ].filter(Boolean).join(', ') || 'None'
-                }
-              </div>
-              <div>
-                <strong>Memory Usage:</strong> {
-                  performance.memory
-                    ? `${(performance.memory.usedJSHeapSize / 1048576).toFixed(2)} MB`
-                    : 'N/A'
-                }
-              </div>
-              <div>
-                <strong>Chart Data Status:</strong> {
-                  displayData.length > 0 ? '✅ Ready' : '⏳ Loading'
-                }
-              </div>
-            </div>
-          </div>
-        )}
         
         {/* Research Questions Section */}
         <div className="research-questions space-y-8">
@@ -900,10 +848,6 @@ function VisualizationsPage() {
               config={{ displayModeBar: false, responsive: true }}
               style={{ width: '100%', height: '100%' }}
             />
-            <div className="findings mt-6 pt-6 border-t border-gray-200">
-              <h3 className="text-lg font-semibold text-gray-900 mb-2">Key Findings:</h3>
-              <p className="text-gray-700">Analysis reveals that [borough] has the highest collision rate with X crashes...</p>
-            </div>
           </div>
 
           {/* QUESTION 2 (Bar Chart) */}
@@ -925,10 +869,6 @@ function VisualizationsPage() {
               config={{ displayModeBar: false, responsive: true }}
               style={{ width: '100%', height: '100%' }}
             />
-            <div className="findings mt-6 pt-6 border-t border-gray-200">
-              <h3 className="text-lg font-semibold text-gray-900 mb-2">Key Findings:</h3>
-              <p className="text-gray-700">Analysis reveals key contributing factors...</p>
-            </div>
           </div>
 
           {/* QUESTION 3 (Line Chart) */}
@@ -950,10 +890,6 @@ function VisualizationsPage() {
               config={{ displayModeBar: false, responsive: true }}
               style={{ width: '100%', height: '100%' }}
             />
-            <div className="findings mt-6 pt-6 border-t border-gray-200">
-              <h3 className="text-lg font-semibold text-gray-900 mb-2">Key Findings:</h3>
-              <p className="text-gray-700">Analysis reveals monthly trends...</p>
-            </div>
           </div>
 
           {/* QUESTION 4 (Line Chart) */}
@@ -975,10 +911,6 @@ function VisualizationsPage() {
               config={{ displayModeBar: false, responsive: true }}
               style={{ width: '100%', height: '100%' }}
             />
-            <div className="findings mt-6 pt-6 border-t border-gray-200">
-              <h3 className="text-lg font-semibold text-gray-900 mb-2">Key Findings:</h3>
-              <p className="text-gray-700">Analysis reveals hourly patterns...</p>
-            </div>
           </div>
 
           {/* QUESTION 5 (Pie Chart) */}
@@ -998,10 +930,6 @@ function VisualizationsPage() {
               config={{ displayModeBar: false, responsive: true }}
               style={{ width: '100%', height: '100%' }}
             />
-            <div className="findings mt-6 pt-6 border-t border-gray-200">
-              <h3 className="text-lg font-semibold text-gray-900 mb-2">Key Findings:</h3>
-              <p className="text-gray-700">Analysis reveals vehicle type distribution...</p>
-            </div>
           </div>
 
           {/* QUESTION 6 (Pie Chart) */}
@@ -1021,10 +949,6 @@ function VisualizationsPage() {
               config={{ displayModeBar: false, responsive: true }}
               style={{ width: '100%', height: '100%' }}
             />
-            <div className="findings mt-6 pt-6 border-t border-gray-200">
-              <h3 className="text-lg font-semibold text-gray-900 mb-2">Key Findings:</h3>
-              <p className="text-gray-700">Analysis reveals borough distribution...</p>
-            </div>
           </div>
 
           {/* QUESTION 7 (Heatmap) */}
@@ -1046,10 +970,6 @@ function VisualizationsPage() {
               config={{ displayModeBar: false, responsive: true }}
               style={{ width: '100%', height: '100%' }}
             />
-            <div className="findings mt-6 pt-6 border-t border-gray-200">
-              <h3 className="text-lg font-semibold text-gray-900 mb-2">Key Findings:</h3>
-              <p className="text-gray-700">Analysis reveals peak collision times...</p>
-            </div>
           </div>
 
           {/* QUESTION 8 (Heatmap) */}
@@ -1074,10 +994,6 @@ function VisualizationsPage() {
               config={{ displayModeBar: false, responsive: true }}
               style={{ width: '100%', height: '100%' }}
             />
-            <div className="findings mt-6 pt-6 border-t border-gray-200">
-              <h3 className="text-lg font-semibold text-gray-900 mb-2">Key Findings:</h3>
-              <p className="text-gray-700">Analysis reveals vehicle-factor combinations...</p>
-            </div>
           </div>
 
           {/* QUESTION 9 (Bar Chart) */}
@@ -1087,11 +1003,7 @@ function VisualizationsPage() {
               <span className="text-xs font-semibold text-blue-600 uppercase tracking-wide">Bar Chart</span>
             </div>
             <h3 className="text-xl font-semibold text-gray-800 mb-6">Where are collision hotspots located across NYC?</h3>
-            <BoroughHotspotRankingChart data={boroughHotspotData} title="Collision Hotspot Ranking Across NYC" />
-            <div className="findings mt-6 pt-6 border-t border-gray-200">
-              <h3 className="text-lg font-semibold text-gray-900 mb-2">Key Findings:</h3>
-              <p className="text-gray-700">Analysis reveals collision hotspots...</p>
-            </div>
+            <BoroughHotspotRankingChart data={boroughHotspotData} title="Collision Hotspot Ranking Across NYC"             />
           </div>
 
           {/* QUESTION 10 (Bubble Chart) */}
@@ -1101,11 +1013,7 @@ function VisualizationsPage() {
               <span className="text-xs font-semibold text-blue-600 uppercase tracking-wide">Bubble Chart</span>
             </div>
             <h3 className="text-xl font-semibold text-gray-800 mb-6">Which boroughs have the highest injury and fatality locations?</h3>
-            <BoroughInjuryFatalityBubbleChart data={boroughInjuryFatalityData} title="Borough Injury and Fatality Severity" />
-            <div className="findings mt-6 pt-6 border-t border-gray-200">
-              <h3 className="text-lg font-semibold text-gray-900 mb-2">Key Findings:</h3>
-              <p className="text-gray-700">Analysis reveals injury and fatality hotspots...</p>
-            </div>
+            <BoroughInjuryFatalityBubbleChart data={boroughInjuryFatalityData} title="Borough Injury and Fatality Severity"             />
           </div>
         </div>
       </div>
