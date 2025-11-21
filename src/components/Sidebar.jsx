@@ -1,5 +1,4 @@
 import { Link, useLocation } from 'react-router-dom'
-import FiltersPanel from './FiltersPanel'
 
 function Sidebar({ isOpen = true }) {
   const location = useLocation()
@@ -36,11 +35,6 @@ function Sidebar({ isOpen = true }) {
             )
           })}
         </nav>
-      </div>
-      
-      {/* Filters Panel - Below Reports Button */}
-      <div className="flex-1 overflow-y-auto border-t border-gray-200">
-        <FiltersPanel position="left" />
       </div>
     </aside>
   )
