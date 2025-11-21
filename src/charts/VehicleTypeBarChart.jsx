@@ -6,10 +6,49 @@
 
 */
 
+import { useMemo } from 'react'
 import BasePlot from './BasePlot'
 
-function VehicleTypeBarChart({ data = [], title = 'Vehicle Type Bar Chart' }) {
-  if (!data || data.length === 0) {
+function normalizeFactor(value) {
+  if (!value) return ''
+  const label = String(value).trim()
+  if (!label) return ''
+  return label
+    .toLowerCase()
+    .split(' ')
+    .map(word => word.charAt(0).toUpperCase() + word.slice(1))
+    .join(' ')
+}
+
+function VehicleTypeBarChart({ data = [], title = 'Vehicle Type Bar Chart', layout: layoutOverride = {} }) {
+  const aggregatedData = useMemo(() => {
+    if (!Array.isArray(data) || data.length === 0) return []
+
+    const counts = data.reduce((acc, record) => {
+      const rawFactor =
+        record?.contributing_factor ||
+        record?.Contributing_Factor ||
+        record?.factor ||
+        record?.Factor ||
+        record?.CONTRIBUTING_FACTOR_VEHICLE_1 ||
+        record?.CONTRIBUTING_FACTOR ||
+        ''
+
+      const factor = normalizeFactor(rawFactor)
+
+      if (!factor || factor.toLowerCase() === 'unspecified') return acc
+
+      acc[factor] = (acc[factor] || 0) + 1
+      return acc
+    }, {})
+
+    return Object.entries(counts)
+      .map(([label, count]) => ({ label, count }))
+      .sort((a, b) => b.count - a.count)
+      .slice(0, 10)
+  }, [data])
+
+  if (!aggregatedData.length) {
     return (
       <div className="w-full h-full min-h-[450px] flex items-center justify-center bg-white rounded-lg border border-gray-200">
         <p className="text-gray-500 text-lg font-medium">This visualization will update once data is provided.</p>
@@ -17,14 +56,11 @@ function VehicleTypeBarChart({ data = [], title = 'Vehicle Type Bar Chart' }) {
     )
   }
 
-  const vehicleTypes = data.map(item => item.vehicle_type || item.vehicleType || item.Vehicle_Type || 'Unknown')
-  const counts = data.map(item => item.count || item.Count || 0)
-
   const plotlyData = [
     {
       type: 'bar',
-      x: vehicleTypes,
-      y: counts,
+      x: aggregatedData.map(item => item.label),
+      y: aggregatedData.map(item => item.count),
       marker: {
         color: '#14b8a6',
         line: {
@@ -34,15 +70,15 @@ function VehicleTypeBarChart({ data = [], title = 'Vehicle Type Bar Chart' }) {
       },
       hovertemplate: '<b>%{x}</b><br>Count: %{y:,.0f}<extra></extra>',
       hoverinfo: 'x+y',
-      text: counts.map(value => value.toLocaleString()),
+      text: aggregatedData.map(value => value.count.toLocaleString()),
       textposition: 'outside'
     }
   ]
 
-  const layout = {
+  const baseLayout = useMemo(() => ({
     xaxis: {
       title: {
-        text: 'Vehicle Type',
+        text: 'Contributing Factor',
         font: { size: 14 }
       },
       tickangle: -30,
@@ -50,14 +86,27 @@ function VehicleTypeBarChart({ data = [], title = 'Vehicle Type Bar Chart' }) {
     },
     yaxis: {
       title: {
-        text: 'Count',
+        text: 'Collisions',
         font: { size: 14 }
       },
       gridcolor: '#e5e7eb',
       zeroline: true
     },
     hovermode: 'x unified'
-  }
+  }), [])
+
+  const layout = useMemo(() => ({
+    ...baseLayout,
+    ...layoutOverride,
+    xaxis: {
+      ...baseLayout.xaxis,
+      ...(layoutOverride.xaxis || {})
+    },
+    yaxis: {
+      ...baseLayout.yaxis,
+      ...(layoutOverride.yaxis || {})
+    }
+  }), [baseLayout, layoutOverride])
 
   return (
     <BasePlot

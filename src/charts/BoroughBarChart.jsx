@@ -9,12 +9,40 @@
 import { useState, useEffect, useMemo } from 'react'
 import BasePlot from './BasePlot'
 
-function BoroughBarChart({ data = [], title = 'Borough Bar Chart' }) {
+function BoroughBarChart({ data = [], title = 'Borough Bar Chart', layout: layoutOverride = {} }) {
   const [plotlyData, setPlotlyData] = useState([])
   const [isVisible, setIsVisible] = useState(true)
 
+  const aggregatedData = useMemo(() => {
+    if (!Array.isArray(data) || data.length === 0) return []
+
+    const counts = data.reduce((acc, record) => {
+      const borough = String(
+        record?.borough ??
+          record?.BOROUGH ??
+          record?.Borough ??
+          ''
+      ).trim()
+
+      if (!borough) return acc
+
+      const normalized = borough
+        .toLowerCase()
+        .split(' ')
+        .map(word => word.charAt(0).toUpperCase() + word.slice(1))
+        .join(' ')
+
+      acc[normalized] = (acc[normalized] || 0) + 1
+      return acc
+    }, {})
+
+    return Object.entries(counts)
+      .map(([borough, count]) => ({ borough, count }))
+      .sort((a, b) => b.count - a.count)
+  }, [data])
+
   // Memoize layout to prevent unnecessary recalculations
-  const layout = useMemo(() => ({
+  const baseLayout = useMemo(() => ({
     xaxis: {
       title: {
         text: 'Borough',
@@ -25,7 +53,7 @@ function BoroughBarChart({ data = [], title = 'Borough Bar Chart' }) {
     },
     yaxis: {
       title: {
-        text: 'Count',
+        text: 'Collisions',
         font: { size: 14 }
       },
       gridcolor: '#e5e7eb'
@@ -33,9 +61,22 @@ function BoroughBarChart({ data = [], title = 'Borough Bar Chart' }) {
     hovermode: 'x unified'
   }), [])
 
+  const layout = useMemo(() => ({
+    ...baseLayout,
+    ...layoutOverride,
+    xaxis: {
+      ...baseLayout.xaxis,
+      ...(layoutOverride.xaxis || {})
+    },
+    yaxis: {
+      ...baseLayout.yaxis,
+      ...(layoutOverride.yaxis || {})
+    }
+  }), [baseLayout, layoutOverride])
+
   // Transform data when props change
   useEffect(() => {
-    if (!data || data.length === 0) {
+    if (!aggregatedData || aggregatedData.length === 0) {
       setPlotlyData([])
       return
     }
@@ -44,9 +85,8 @@ function BoroughBarChart({ data = [], title = 'Borough Bar Chart' }) {
     setIsVisible(false)
     
     const timer = setTimeout(() => {
-      // Convert data array to Plotly format
-      const boroughs = data.map(item => item.borough || item.Borough || '')
-      const counts = data.map(item => item.count || item.Count || 0)
+      const boroughs = aggregatedData.map(item => item.borough)
+      const counts = aggregatedData.map(item => item.count)
 
       // Create Plotly trace for vertical bar chart
       const newPlotlyData = [
@@ -63,7 +103,7 @@ function BoroughBarChart({ data = [], title = 'Borough Bar Chart' }) {
           },
           text: counts.map(count => count.toLocaleString()),
           textposition: 'outside',
-          hovertemplate: '<b>%{x}</b><br>Count: %{y:,.0f}<extra></extra>',
+          hovertemplate: '<b>%{x}</b><br>Collisions: %{y:,.0f}<extra></extra>',
           hoverinfo: 'x+y'
         }
       ]
@@ -73,10 +113,10 @@ function BoroughBarChart({ data = [], title = 'Borough Bar Chart' }) {
     }, 150)
 
     return () => clearTimeout(timer)
-  }, [data])
+  }, [aggregatedData])
 
   // Handle empty data case
-  if (!data || data.length === 0 || plotlyData.length === 0) {
+  if (!aggregatedData.length || plotlyData.length === 0) {
     return (
       <div className="w-full h-full min-h-[450px] flex items-center justify-center bg-white rounded-lg border border-gray-200">
         <p className="text-gray-500 text-lg font-medium">This visualization will update once data is provided.</p>

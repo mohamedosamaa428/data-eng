@@ -11,7 +11,78 @@
 import { useState, useEffect, useMemo } from 'react'
 import BasePlot from './BasePlot'
 
-function HeatmapHourlyDaily({ data = [], title = 'Heatmap Hourly Daily' }) {
+const DAY_NAMES = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday']
+
+function normalizeDay(value) {
+  if (!value) return ''
+  const normalized = String(value)
+    .trim()
+    .toLowerCase()
+
+  const match = DAY_NAMES.find(day =>
+    day.toLowerCase().startsWith(normalized)
+  )
+
+  return match || ''
+}
+
+function getDayName(record) {
+  const explicitDay =
+    record?.day ||
+    record?.Day ||
+    record?.DAY ||
+    record?.day_of_week ||
+    record?.DAY_OF_WEEK
+
+  if (explicitDay) {
+    return normalizeDay(explicitDay)
+  }
+
+  const rawDate =
+    record?.crash_date ||
+    record?.CRASH_DATE ||
+    record?.Crash_Date ||
+    record?.date ||
+    record?.Date
+
+  if (rawDate) {
+    const parsed = new Date(rawDate)
+    if (!Number.isNaN(parsed)) {
+      return DAY_NAMES[parsed.getDay()]
+    }
+  }
+
+  return ''
+}
+
+function getHour(record) {
+  if (record?.hour !== undefined) {
+    const parsed = Number(record.hour)
+    if (!Number.isNaN(parsed) && parsed >= 0 && parsed < 24) return parsed
+  }
+
+  if (record?.Hour !== undefined) {
+    const parsed = Number(record.Hour)
+    if (!Number.isNaN(parsed) && parsed >= 0 && parsed < 24) return parsed
+  }
+
+  const rawTime =
+    record?.crash_time ||
+    record?.CRASH_TIME ||
+    record?.Crash_Time ||
+    record?.time ||
+    record?.Time
+
+  if (rawTime) {
+    const [hourToken] = String(rawTime).split(':')
+    const parsed = Number(hourToken)
+    if (!Number.isNaN(parsed) && parsed >= 0 && parsed < 24) return parsed
+  }
+
+  return null
+}
+
+function HeatmapHourlyDaily({ data = [], title = 'Heatmap Hourly Daily', layout: layoutOverride = {} }) {
   const [plotlyData, setPlotlyData] = useState([])
   const [isVisible, setIsVisible] = useState(true)
 
@@ -21,8 +92,33 @@ function HeatmapHourlyDaily({ data = [], title = 'Heatmap Hourly Daily' }) {
   // Hours (0-23) - memoized
   const hours = useMemo(() => Array.from({ length: 24 }, (_, i) => i), [])
 
+  const aggregatedMatrix = useMemo(() => {
+    if (!Array.isArray(data) || data.length === 0) {
+      return daysOrder.map(() => Array(24).fill(0))
+    }
+
+    const matrix = daysOrder.map(() => Array(24).fill(0))
+
+    data.forEach(record => {
+      const dayName = getDayName(record)
+      const hour = getHour(record)
+
+      if (!dayName || hour === null || hour === undefined) return
+
+      const dayIndex = daysOrder.findIndex(
+        day => day.toLowerCase() === dayName.toLowerCase()
+      )
+
+      if (dayIndex === -1) return
+
+      matrix[dayIndex][hour] += 1
+    })
+
+    return matrix
+  }, [data, daysOrder])
+
   // Memoize layout to prevent unnecessary recalculations
-  const layout = useMemo(() => ({
+  const baseLayout = useMemo(() => ({
     xaxis: {
       title: {
         text: 'Hour of Day',
@@ -47,9 +143,22 @@ function HeatmapHourlyDaily({ data = [], title = 'Heatmap Hourly Daily' }) {
     hovermode: 'closest'
   }), [])
 
+  const layout = useMemo(() => ({
+    ...baseLayout,
+    ...layoutOverride,
+    xaxis: {
+      ...baseLayout.xaxis,
+      ...(layoutOverride.xaxis || {})
+    },
+    yaxis: {
+      ...baseLayout.yaxis,
+      ...(layoutOverride.yaxis || {})
+    }
+  }), [baseLayout, layoutOverride])
+
   // Transform data when props change
   useEffect(() => {
-    if (!data || data.length === 0) {
+    if (!aggregatedMatrix || aggregatedMatrix.length === 0) {
       setPlotlyData([])
       return
     }
@@ -59,32 +168,13 @@ function HeatmapHourlyDaily({ data = [], title = 'Heatmap Hourly Daily' }) {
     
     const timer = setTimeout(() => {
       // Initialize 2D matrix: 7 rows (days) x 24 columns (hours)
-      const matrix = daysOrder.map(() => Array(24).fill(0))
-
-      // Fill matrix with data
-      data.forEach(item => {
-        const day = item.day || item.Day || ''
-        const hour = item.hour !== undefined ? item.hour : (item.Hour !== undefined ? item.Hour : null)
-        const count = item.count !== undefined ? item.count : (item.Count !== undefined ? item.Count : 0)
-
-        if (day && hour !== null && hour >= 0 && hour < 24) {
-          const dayIndex = daysOrder.findIndex(d => 
-            d.toLowerCase() === day.toLowerCase()
-          )
-          
-          if (dayIndex !== -1) {
-            matrix[dayIndex][hour] = (matrix[dayIndex][hour] || 0) + count
-          }
-        }
-      })
-
       // Create Plotly trace for heatmap
       const newPlotlyData = [
         {
           type: 'heatmap',
           x: hours,
           y: daysOrder,
-          z: matrix,
+          z: aggregatedMatrix,
           colorscale: 'YlOrRd',
           hovertemplate: '<b>%{y}</b><br>Hour: %{x}:00<br>Count: %{z:,.0f}<extra></extra>',
           showscale: true,
@@ -107,10 +197,12 @@ function HeatmapHourlyDaily({ data = [], title = 'Heatmap Hourly Daily' }) {
     }, 150)
 
     return () => clearTimeout(timer)
-  }, [data, daysOrder, hours])
+  }, [aggregatedMatrix, daysOrder, hours])
 
   // Handle empty data case
-  if (!data || data.length === 0 || plotlyData.length === 0) {
+  const hasValues = aggregatedMatrix.some(row => row.some(value => value > 0))
+
+  if (!hasValues || plotlyData.length === 0) {
     return (
       <div className="w-full h-full min-h-[450px] flex items-center justify-center bg-white rounded-lg border border-gray-200">
         <p className="text-gray-500 text-lg font-medium">This visualization will update once data is provided.</p>

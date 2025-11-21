@@ -8,10 +8,58 @@
 
 */
 
+import { useMemo } from 'react'
 import BasePlot from './BasePlot'
 
-function HourlyTrendLineChart({ data = [], title = 'Hourly Trend Line Chart' }) {
-  if (!data || data.length === 0) {
+function getHour(record) {
+  if (record?.hour !== undefined) {
+    const parsed = Number(record.hour)
+    if (!Number.isNaN(parsed) && parsed >= 0 && parsed < 24) {
+      return parsed
+    }
+  }
+
+  if (record?.Hour !== undefined) {
+    const parsed = Number(record.Hour)
+    if (!Number.isNaN(parsed) && parsed >= 0 && parsed < 24) {
+      return parsed
+    }
+  }
+
+  const rawTime =
+    record?.crash_time ||
+    record?.CRASH_TIME ||
+    record?.Crash_Time ||
+    record?.time ||
+    record?.Time
+
+  if (rawTime) {
+    const [hourToken] = String(rawTime).split(':')
+    const parsed = Number(hourToken)
+    if (!Number.isNaN(parsed) && parsed >= 0 && parsed < 24) {
+      return parsed
+    }
+  }
+
+  return null
+}
+
+function HourlyTrendLineChart({ data = [], title = 'Hourly Trend Line Chart', layout: layoutOverride = {} }) {
+  const aggregatedData = useMemo(() => {
+    if (!Array.isArray(data) || data.length === 0) return []
+
+    const counts = Array.from({ length: 24 }, () => 0)
+
+    data.forEach(record => {
+      const hour = getHour(record)
+      if (hour === null || hour === undefined) return
+      counts[hour] += 1
+    })
+
+    return counts.map((count, hour) => ({ hour, count }))
+  }, [data])
+
+  if (!aggregatedData.length || aggregatedData.every(item => item.count === 0)) {
     return (
       <div className="w-full h-full min-h-[450px] flex items-center justify-center bg-white rounded-lg border border-gray-200">
         <p className="text-gray-500 text-lg font-medium">This visualization will update once data is provided.</p>
@@ -19,15 +67,12 @@ function HourlyTrendLineChart({ data = [], title = 'Hourly Trend Line Chart' }) 
     )
   }
 
-  const hours = data.map(item => item.hour ?? item.Hour ?? 0)
-  const counts = data.map(item => item.count ?? item.Count ?? 0)
-
   const plotlyData = [
     {
       type: 'scatter',
       mode: 'lines+markers',
-      x: hours,
-      y: counts,
+      x: aggregatedData.map(item => item.hour),
+      y: aggregatedData.map(item => item.count),
       line: {
         color: '#6366f1',
         width: 3,
@@ -41,12 +86,12 @@ function HourlyTrendLineChart({ data = [], title = 'Hourly Trend Line Chart' }) 
           width: 2
         }
       },
-      hovertemplate: '<b>Hour %{x}:00</b><br>Count: %{y:,.0f}<extra></extra>',
+      hovertemplate: '<b>Hour %{x}:00</b><br>Collisions: %{y:,.0f}<extra></extra>',
       hoverinfo: 'x+y'
     }
   ]
 
-  const layout = {
+  const baseLayout = useMemo(() => ({
     xaxis: {
       title: {
         text: 'Hour of Day',
@@ -61,7 +106,7 @@ function HourlyTrendLineChart({ data = [], title = 'Hourly Trend Line Chart' }) 
     },
     yaxis: {
       title: {
-        text: 'Count',
+        text: 'Collisions',
         font: { size: 14 }
       },
       gridcolor: '#e5e7eb',
@@ -69,7 +114,20 @@ function HourlyTrendLineChart({ data = [], title = 'Hourly Trend Line Chart' }) 
       zeroline: true
     },
     hovermode: 'x unified'
-  }
+  }), [])
+
+  const layout = useMemo(() => ({
+    ...baseLayout,
+    ...layoutOverride,
+    xaxis: {
+      ...baseLayout.xaxis,
+      ...(layoutOverride.xaxis || {})
+    },
+    yaxis: {
+      ...baseLayout.yaxis,
+      ...(layoutOverride.yaxis || {})
+    }
+  }), [baseLayout, layoutOverride])
 
   return (
     <BasePlot

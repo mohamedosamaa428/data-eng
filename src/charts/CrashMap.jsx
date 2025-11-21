@@ -11,7 +11,7 @@
 import { useState, useEffect, useMemo } from 'react'
 import BasePlot from './BasePlot'
 
-function CrashMap({ data = [], title = 'Crash Map' }) {
+function CrashMap({ data = [], title = 'Crash Map', layout: layoutOverride = {} }) {
   const [plotlyData, setPlotlyData] = useState([])
   const [layout, setLayout] = useState({})
   const [isVisible, setIsVisible] = useState(true)
@@ -50,8 +50,8 @@ function CrashMap({ data = [], title = 'Crash Map' }) {
       // Filter and process data - remove invalid coordinates
       const processedData = data
         .filter(item => {
-          const lat = item.latitude || item.Latitude
-          const lon = item.longitude || item.Longitude
+          const lat = Number(item.latitude ?? item.Latitude ?? item.LATITUDE)
+          const lon = Number(item.longitude ?? item.Longitude ?? item.LONGITUDE)
           // Validate coordinates (NYC bounds approximately: lat 40.4-40.9, lon -74.3 to -73.7)
           return (
             lat != null && 
@@ -63,13 +63,19 @@ function CrashMap({ data = [], title = 'Crash Map' }) {
           )
         })
         .map(item => ({
-          latitude: item.latitude || item.Latitude,
-          longitude: item.longitude || item.Longitude,
-          severity: item.severity || item.Severity || 'Unknown',
-          borough: item.borough || item.Borough || 'Unknown',
-          date: item.date || item.Date || item.crash_date || item.Crash_Date || 'Unknown',
-          time: item.time || item.Time || item.crash_time || item.Crash_Time || 'Unknown',
-          injuries: item.injuries || item.Injuries || item.number_of_injured || item.Number_of_Injured || 0
+          latitude: Number(item.latitude ?? item.Latitude ?? item.LATITUDE),
+          longitude: Number(item.longitude ?? item.Longitude ?? item.LONGITUDE),
+          severity: item.severity || item.Severity || item.SEVERITY || 'Unknown',
+          borough: item.borough || item.Borough || item.BOROUGH || 'Unknown',
+          date: item.date || item.Date || item.crash_date || item.Crash_Date || item.CRASH_DATE || 'Unknown',
+          time: item.time || item.Time || item.crash_time || item.Crash_Time || item.CRASH_TIME || 'Unknown',
+          injuries:
+            item.injuries ||
+            item.Injuries ||
+            item.number_of_injured ||
+            item.Number_of_Injured ||
+            item.NUMBER_OF_INJURED ||
+            0
         }))
 
       if (processedData.length === 0) {
@@ -151,13 +157,26 @@ function CrashMap({ data = [], title = 'Crash Map' }) {
         hovermode: 'closest'
       }
 
+      const mergedLayout = {
+        ...newLayout,
+        ...layoutOverride,
+        mapbox: {
+          ...newLayout.mapbox,
+          ...(layoutOverride.mapbox || {})
+        },
+        margin: {
+          ...newLayout.margin,
+          ...(layoutOverride.margin || {})
+        }
+      }
+
       setPlotlyData(newPlotlyData)
-      setLayout(newLayout)
+      setLayout(mergedLayout)
       setIsVisible(true)
     }, 150)
 
     return () => clearTimeout(timer)
-  }, [data, getSeverityColor])
+  }, [data, getSeverityColor, layoutOverride])
 
   // Handle empty data case
   if (!data || data.length === 0 || plotlyData.length === 0) {

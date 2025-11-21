@@ -8,25 +8,45 @@
 
 */
 
+import { useMemo } from 'react'
 import BasePlot from './BasePlot'
 
-function InjurySeverityPieChart({ data = [], title = 'Injury Severity Distribution' }) {
-  if (!data || data.length === 0) {
-    return (
-      <div className="w-full h-full min-h-[450px] flex items-center justify-center bg-white rounded-lg border border-gray-200">
-        <p className="text-gray-500 text-lg font-medium">This visualization will update once data is provided.</p>
-      </div>
-    )
-  }
+function normalizeInjury(value) {
+  if (!value) return 'Unknown'
+  return String(value)
+    .trim()
+    .toLowerCase()
+    .split(' ')
+    .map(word => word.charAt(0).toUpperCase() + word.slice(1))
+    .join(' ')
+}
 
-  const severities = data.map(item => item.severity || item.Severity || 'Unknown')
-  const counts = data.map(item => item.count || item.Count || 0)
+function InjurySeverityPieChart({ data = [], title = 'Injury Severity Distribution', layout: layoutOverride = {} }) {
+  const aggregatedData = useMemo(() => {
+    if (!Array.isArray(data) || data.length === 0) return []
 
-  const validData = severities
-    .map((label, idx) => ({ label, value: counts[idx] }))
-    .filter(({ value }) => value > 0)
+    const counts = data.reduce((acc, record) => {
+      const severity =
+        record?.injury_severity ||
+        record?.Injury_Severity ||
+        record?.severity ||
+        record?.Severity ||
+        record?.PERSON_INJURY ||
+        record?.person_injury ||
+        record?.injury ||
+        'Unknown'
 
-  if (validData.length === 0) {
+      const normalized = normalizeInjury(severity || 'Unknown')
+      acc[normalized] = (acc[normalized] || 0) + 1
+      return acc
+    }, {})
+
+    return Object.entries(counts)
+      .map(([label, value]) => ({ label, value }))
+      .sort((a, b) => b.value - a.value)
+  }, [data])
+
+  if (!aggregatedData.length || aggregatedData.every(item => item.value === 0)) {
     return (
       <div className="w-full h-full min-h-[450px] flex items-center justify-center bg-white rounded-lg border border-gray-200">
         <p className="text-gray-500 text-lg font-medium">This visualization will update once data is provided.</p>
@@ -37,8 +57,8 @@ function InjurySeverityPieChart({ data = [], title = 'Injury Severity Distributi
   const plotlyData = [
     {
       type: 'pie',
-      labels: validData.map(item => item.label),
-      values: validData.map(item => item.value),
+      labels: aggregatedData.map(item => item.label),
+      values: aggregatedData.map(item => item.value),
       hole: 0.4,
       hovertemplate: '<b>%{label}</b><br>Count: %{value:,.0f}<br>Share: %{percent}<extra></extra>',
       hoverinfo: 'label+value+percent',
@@ -61,7 +81,7 @@ function InjurySeverityPieChart({ data = [], title = 'Injury Severity Distributi
     }
   ]
 
-  const layout = {
+  const baseLayout = useMemo(() => ({
     showlegend: true,
     legend: {
       orientation: 'h',
@@ -83,7 +103,21 @@ function InjurySeverityPieChart({ data = [], title = 'Injury Severity Distributi
         yanchor: 'middle'
       }
     ]
-  }
+  }), [title])
+
+  const layout = useMemo(() => ({
+    ...baseLayout,
+    ...layoutOverride,
+    legend: {
+      ...baseLayout.legend,
+      ...(layoutOverride.legend || {})
+    },
+    margin: {
+      ...baseLayout.margin,
+      ...(layoutOverride.margin || {})
+    },
+    annotations: layoutOverride.annotations || baseLayout.annotations
+  }), [baseLayout, layoutOverride])
 
   return (
     <BasePlot

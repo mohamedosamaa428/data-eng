@@ -11,10 +11,49 @@
 import { useState, useEffect, useMemo } from 'react'
 import BasePlot from './BasePlot'
 
-function VehiclePieChart({ data = [], title = 'Vehicle Pie Chart' }) {
+function normalizeVehicle(value) {
+  if (!value) return ''
+  const label = String(value).trim()
+  if (!label) return ''
+  return label
+    .toLowerCase()
+    .split(' ')
+    .map(word => word.charAt(0).toUpperCase() + word.slice(1))
+    .join(' ')
+}
+
+function VehiclePieChart({ data = [], title = 'Vehicle Pie Chart', layout: layoutOverride = {} }) {
   const [plotlyData, setPlotlyData] = useState([])
   const [layout, setLayout] = useState({})
   const [isVisible, setIsVisible] = useState(true)
+
+  const aggregatedData = useMemo(() => {
+    if (!Array.isArray(data) || data.length === 0) return []
+
+    const counts = data.reduce((acc, record) => {
+      const vehicle =
+        record?.vehicle_type ||
+        record?.vehicleType ||
+        record?.Vehicle_Type ||
+        record?.VehicleType ||
+        record?.VEHICLE_TYPE_CODE_1 ||
+        record?.VEHICLE_TYPE_CODE ||
+        record?.vehicle ||
+        record?.Vehicle ||
+        ''
+
+      const normalized = normalizeVehicle(vehicle || '')
+      if (!normalized) return acc
+
+      acc[normalized] = (acc[normalized] || 0) + 1
+      return acc
+    }, {})
+
+    return Object.entries(counts)
+      .map(([label, value]) => ({ label, value }))
+      .sort((a, b) => b.value - a.value)
+      .slice(0, 10)
+  }, [data])
 
   // Memoize color palette
   const colors = useMemo(() => [
@@ -32,7 +71,7 @@ function VehiclePieChart({ data = [], title = 'Vehicle Pie Chart' }) {
 
   // Transform data when props change
   useEffect(() => {
-    if (!data || data.length === 0) {
+    if (!aggregatedData || aggregatedData.length === 0) {
       setPlotlyData([])
       setLayout({})
       return
@@ -42,24 +81,8 @@ function VehiclePieChart({ data = [], title = 'Vehicle Pie Chart' }) {
     setIsVisible(false)
     
     const timer = setTimeout(() => {
-      // Convert data array to Plotly format
-      const labels = data.map(item => item.category || item.Category || 'Unknown')
-      const values = data.map(item => item.count || item.Count || 0)
-
-      // Filter out entries with zero or invalid values
-      const validData = labels.map((label, index) => ({
-        label,
-        value: values[index]
-      })).filter(item => item.value > 0)
-
-      if (validData.length === 0) {
-        setPlotlyData([])
-        setLayout({})
-        return
-      }
-
-      const validLabels = validData.map(item => item.label)
-      const validValues = validData.map(item => item.value)
+      const validLabels = aggregatedData.map(item => item.label)
+      const validValues = aggregatedData.map(item => item.value)
 
       // Create Plotly trace for pie chart (donut mode)
       const newPlotlyData = [
@@ -121,16 +144,30 @@ function VehiclePieChart({ data = [], title = 'Vehicle Pie Chart' }) {
         }
       }
 
+      const mergedLayout = {
+        ...newLayout,
+        ...layoutOverride,
+        legend: {
+          ...newLayout.legend,
+          ...(layoutOverride.legend || {})
+        },
+        margin: {
+          ...newLayout.margin,
+          ...(layoutOverride.margin || {})
+        },
+        annotations: layoutOverride.annotations || newLayout.annotations
+      }
+
       setPlotlyData(newPlotlyData)
-      setLayout(newLayout)
+      setLayout(mergedLayout)
       setIsVisible(true)
     }, 150)
 
     return () => clearTimeout(timer)
-  }, [data, title, colors])
+  }, [aggregatedData, title, colors, layoutOverride])
 
   // Handle empty data case
-  if (!data || data.length === 0 || plotlyData.length === 0) {
+  if (!aggregatedData.length || plotlyData.length === 0) {
     return (
       <div className="w-full h-full min-h-[450px] flex items-center justify-center bg-white rounded-lg border border-gray-200">
         <p className="text-gray-500 text-lg font-medium">This visualization will update once data is provided.</p>

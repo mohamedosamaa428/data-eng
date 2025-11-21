@@ -8,32 +8,62 @@
 
 */
 
+import { useMemo } from 'react'
 import BasePlot from './BasePlot'
 
-function CrashDensityMap({ data = [], title = 'Crash Density Map' }) {
-  if (!data || data.length === 0) {
-    return (
-      <div className="w-full h-full min-h-[450px] flex items-center justify-center bg-white rounded-lg border border-gray-200">
-        <p className="text-gray-500 text-lg font-medium">This visualization will update once data is provided.</p>
-      </div>
-    )
-  }
+function CrashDensityMap({ data = [], title = 'Crash Density Map', layout: layoutOverride = {} }) {
+  const processed = useMemo(() => {
+    if (!Array.isArray(data) || data.length === 0) return []
 
-  const processed = data
-    .map(item => ({
-      latitude: item.latitude ?? item.Latitude,
-      longitude: item.longitude ?? item.Longitude,
-      density: item.density ?? item.Density ?? 0
-    }))
-    .filter(
-      point =>
-        point.latitude != null &&
-        point.longitude != null &&
-        !Number.isNaN(point.latitude) &&
-        !Number.isNaN(point.longitude)
-    )
+    const pointMap = new Map()
 
-  if (processed.length === 0) {
+    data.forEach(record => {
+      const lat = Number(record.latitude ?? record.Latitude ?? record.LATITUDE)
+      const lon = Number(record.longitude ?? record.Longitude ?? record.LONGITUDE)
+
+      if (
+        Number.isNaN(lat) ||
+        Number.isNaN(lon) ||
+        lat < 40.0 ||
+        lat > 41.0 ||
+        lon < -75.0 ||
+        lon > -73.0
+      ) {
+        return
+      }
+
+      const injuries =
+        Number(
+          record.injuries ??
+            record.Injuries ??
+            record.number_of_persons_injured ??
+            record.NUMBER_OF_PERSONS_INJURED ??
+            record.number_of_injured ??
+            record.Number_of_Injured
+        ) || 0
+
+      const fatalities =
+        Number(
+          record.number_of_persons_killed ??
+            record.NUMBER_OF_PERSONS_KILLED ??
+            record.fatalities ??
+            record.Fatalities
+        ) || 0
+
+      const densityContribution = Math.max(injuries + fatalities * 2, 1)
+      const key = `${lat.toFixed(3)}|${lon.toFixed(3)}`
+
+      if (!pointMap.has(key)) {
+        pointMap.set(key, { latitude: lat, longitude: lon, density: 0 })
+      }
+
+      pointMap.get(key).density += densityContribution
+    })
+
+    return Array.from(pointMap.values())
+  }, [data])
+
+  if (!processed.length) {
     return (
       <div className="w-full h-full min-h-[450px] flex items-center justify-center bg-white rounded-lg border border-gray-200">
         <p className="text-gray-500 text-lg font-medium">This visualization will update once data is provided.</p>
@@ -77,7 +107,7 @@ function CrashDensityMap({ data = [], title = 'Crash Density Map' }) {
   const centerLat = lats.reduce((sum, value) => sum + value, 0) / lats.length
   const centerLon = lons.reduce((sum, value) => sum + value, 0) / lons.length
 
-  const layout = {
+  const baseLayout = {
     mapbox: {
       style: 'open-street-map',
       center: { lat: centerLat, lon: centerLon },
@@ -87,6 +117,19 @@ function CrashDensityMap({ data = [], title = 'Crash Density Map' }) {
     },
     margin: { l: 0, r: 0, t: 60, b: 0 },
     hovermode: 'closest'
+  }
+
+  const layout = {
+    ...baseLayout,
+    ...layoutOverride,
+    mapbox: {
+      ...baseLayout.mapbox,
+      ...(layoutOverride.mapbox || {})
+    },
+    margin: {
+      ...baseLayout.margin,
+      ...(layoutOverride.margin || {})
+    }
   }
 
   return <BasePlot title={title} data={plotlyData} layout={layout} />
