@@ -13,8 +13,6 @@ import {
   processCollisionHotspots,
   processInjuryFatalityMap
 } from '../utils/dataProcessing'
-import CrashMap from '../charts/CrashMap'
-import CrashDensityMap from '../charts/CrashDensityMap'
 import BoroughHotspotRankingChart from '../charts/BoroughHotspotRankingChart'
 import BoroughInjuryFatalityBubbleChart from '../charts/BoroughInjuryFatalityBubbleChart'
 import SearchBar from '../components/SearchBar'
@@ -23,20 +21,6 @@ const toNumber = (value) => {
   if (value === null || value === undefined || value === '') return undefined
   const parsed = Number(value)
   return Number.isFinite(parsed) ? parsed : undefined
-}
-
-const isValidCoordinate = (lat, lon) =>
-  typeof lat === 'number' &&
-  typeof lon === 'number' &&
-  lat >= 40 &&
-  lat <= 41 &&
-  lon >= -75 &&
-  lon <= -73
-
-const sampleArray = (array, limit) => {
-  if (array.length <= limit) return array
-  const step = Math.ceil(array.length / limit)
-  return array.filter((_, idx) => idx % step === 0).slice(0, limit)
 }
 
 /**
@@ -138,89 +122,6 @@ function parseSearchQuery(query) {
   return result
 }
 
-const buildCrashMapData = (rows) => {
-  if (!rows || rows.length === 0) return []
-
-  const transformed = rows
-    .map((row) => {
-      const latitude =
-        toNumber(row.LATITUDE ?? row.latitude ?? row.Latitude ?? row.lat ?? row.Lat)
-      const longitude =
-        toNumber(row.LONGITUDE ?? row.longitude ?? row.Longitude ?? row.lon ?? row.Lon)
-
-      if (!isValidCoordinate(latitude, longitude)) return null
-
-      const injuries =
-        toNumber(
-          row.NUMBER_OF_PERSONS_INJURED ??
-            row['NUMBER OF PERSONS INJURED'] ??
-            row.injuries ??
-            row.Injuries
-        ) || 0
-      const killed =
-        toNumber(
-          row.NUMBER_OF_PERSONS_KILLED ??
-            row['NUMBER OF PERSONS KILLED'] ??
-            row.killed ??
-            row.Killed
-        ) || 0
-
-      let severity = 'Minor'
-      if (killed > 0) severity = 'Fatal'
-      else if (injuries > 0) severity = 'Injury'
-
-      return {
-        latitude,
-        longitude,
-        severity,
-        borough: row.BOROUGH ?? row['BOROUGH'] ?? 'Unknown',
-        date: row.CRASH_DATE ?? row['CRASH DATE'] ?? '',
-        time: row.CRASH_TIME ?? row['CRASH TIME'] ?? '',
-        injuries
-      }
-    })
-    .filter(Boolean)
-
-  return sampleArray(transformed, 10000)
-}
-
-const buildCrashDensityData = (rows) => {
-  if (!rows || rows.length === 0) return []
-
-  const transformed = rows
-    .map((row) => {
-      const latitude =
-        toNumber(row.LATITUDE ?? row.latitude ?? row.Latitude ?? row.lat ?? row.Lat)
-      const longitude =
-        toNumber(row.LONGITUDE ?? row.longitude ?? row.Longitude ?? row.lon ?? row.Lon)
-
-      if (!isValidCoordinate(latitude, longitude)) return null
-
-      const injuries =
-        toNumber(
-          row.NUMBER_OF_PERSONS_INJURED ??
-            row['NUMBER OF PERSONS INJURED'] ??
-            row.injuries ??
-            row.Injuries
-        ) || 0
-      const killed =
-        toNumber(
-          row.NUMBER_OF_PERSONS_KILLED ??
-            row['NUMBER OF PERSONS KILLED'] ??
-            row.killed ??
-            row.Killed
-        ) || 0
-
-      return {
-        latitude,
-        longitude,
-        density: injuries + killed * 10
-      }
-    })
-    .filter(Boolean)
-
-  return sampleArray(transformed, 10000)
-}
 
 function VisualizationsPage() {
   const [data, setData] = useState([])
@@ -609,9 +510,6 @@ function VisualizationsPage() {
   // Use filteredData if it exists, otherwise use all data
   const displayData = filteredData.length > 0 ? filteredData : data
 
-  const crashMapData = useMemo(() => buildCrashMapData(displayData), [displayData])
-  const crashDensityData = useMemo(() => buildCrashDensityData(displayData), [displayData])
-  
   // Process borough hotspot data for Q9 bar chart
   const boroughHotspotData = useMemo(() => {
     const boroughData = processBoroughCollisions(displayData)
@@ -840,6 +738,7 @@ function VisualizationsPage() {
             <h2 className="text-2xl font-bold text-gray-900 mb-2">Research Question 1</h2>
             <div className="mb-2">
               <span className="text-xs font-semibold text-blue-600 uppercase tracking-wide">Bar Chart</span>
+              <span className="text-xs text-gray-600 ml-3">— Team Member: mohamed osama</span>
             </div>
             <h3 className="text-xl font-semibold text-gray-800 mb-6">Which borough has the highest number of collisions?</h3>
             <Plot
@@ -854,6 +753,10 @@ function VisualizationsPage() {
               config={{ displayModeBar: true, responsive: true, displaylogo: false, modeBarButtonsToRemove: ['pan2d', 'lasso2d'] }}
               style={{ width: '100%', height: '100%' }}
             />
+            <div className="findings mt-6 pt-6 border-t border-gray-200">
+              <h3 className="text-lg font-semibold text-gray-900 mb-2">Key Findings:</h3>
+              <p className="text-gray-700">The chart shows that Brooklyn has the highest number of collisions by a large margin, indicating heavier traffic flow and greater exposure to high-risk road conditions. Queens and Manhattan follow with moderate collision levels, while the Bronx records noticeably fewer incidents. Staten Island remains the least affected borough, reflecting its smaller population and lower traffic density.</p>
+            </div>
           </div>
 
           {/* QUESTION 2 (Bar Chart) */}
@@ -861,6 +764,7 @@ function VisualizationsPage() {
             <h2 className="text-2xl font-bold text-gray-900 mb-2">Research Question 2</h2>
             <div className="mb-2">
               <span className="text-xs font-semibold text-blue-600 uppercase tracking-wide">Bar Chart</span>
+              <span className="text-xs text-gray-600 ml-3">— Team Member: seif mohamed</span>
             </div>
             <h3 className="text-xl font-semibold text-gray-800 mb-6">What are the top 10 contributing factors that cause collisions?</h3>
             <Plot
@@ -878,6 +782,10 @@ function VisualizationsPage() {
               config={{ displayModeBar: true, responsive: true, displaylogo: false, modeBarButtonsToRemove: ['pan2d', 'lasso2d'] }}
               style={{ width: '100%', height: '100%' }}
             />
+            <div className="findings mt-6 pt-6 border-t border-gray-200">
+              <h3 className="text-lg font-semibold text-gray-900 mb-2">Key Findings:</h3>
+              <p className="text-gray-700">The chart shows that driver inattention or distraction is the leading cause of collisions by a very large margin. Factors like following too closely, failing to yield, and backing unsafely also contribute to many accidents but at much lower levels. The remaining factors, such as turning improperly and unsafe lane changes, appear less frequently. Overall, most collisions seem to happen because drivers are not fully focused on the road.</p>
+            </div>
           </div>
 
           {/* QUESTION 3 (Line Chart) */}
@@ -885,6 +793,7 @@ function VisualizationsPage() {
             <h2 className="text-2xl font-bold text-gray-900 mb-2">Research Question 3</h2>
             <div className="mb-2">
               <span className="text-xs font-semibold text-blue-600 uppercase tracking-wide">Line Chart</span>
+              <span className="text-xs text-gray-600 ml-3">— Team Member: mahmoud amr</span>
             </div>
             <h3 className="text-xl font-semibold text-gray-800 mb-6">How do collisions change month-by-month over the years?</h3>
             <Plot
@@ -899,6 +808,10 @@ function VisualizationsPage() {
               config={{ displayModeBar: true, responsive: true, displaylogo: false, modeBarButtonsToRemove: ['pan2d', 'lasso2d'] }}
               style={{ width: '100%', height: '100%' }}
             />
+            <div className="findings mt-6 pt-6 border-t border-gray-200">
+              <h3 className="text-lg font-semibold text-gray-900 mb-2">Key Findings:</h3>
+              <p className="text-gray-700">The chart shows that collisions stayed at a steady level for many years with small ups and downs. Around 2020, there is a sharp drop, likely because fewer people were outside during the pandemic. After that, the numbers stayed lower and did not return to the earlier levels, showing a clear long-term decrease in collisions.</p>
+            </div>
           </div>
 
           {/* QUESTION 4 (Line Chart) */}
@@ -906,6 +819,7 @@ function VisualizationsPage() {
             <h2 className="text-2xl font-bold text-gray-900 mb-2">Research Question 4</h2>
             <div className="mb-2">
               <span className="text-xs font-semibold text-blue-600 uppercase tracking-wide">Line Chart</span>
+              <span className="text-xs text-gray-600 ml-3">— Team Member: ahmed walid</span>
             </div>
             <h3 className="text-xl font-semibold text-gray-800 mb-6">How do collisions change during the hours of the day?</h3>
             <Plot
@@ -920,6 +834,10 @@ function VisualizationsPage() {
               config={{ displayModeBar: true, responsive: true, displaylogo: false, modeBarButtonsToRemove: ['pan2d', 'lasso2d'] }}
               style={{ width: '100%', height: '100%' }}
             />
+            <div className="findings mt-6 pt-6 border-t border-gray-200">
+              <h3 className="text-lg font-semibold text-gray-900 mb-2">Key Findings:</h3>
+              <p className="text-gray-700">Collisions are lowest during the early morning hours when there is little traffic. The numbers rise quickly after 6 AM and stay high through the afternoon. The peak happens in the late afternoon and early evening, when roads are busiest, and then collisions slowly decrease again at night.</p>
+            </div>
           </div>
 
           {/* QUESTION 5 (Pie Chart) */}
@@ -927,6 +845,7 @@ function VisualizationsPage() {
             <h2 className="text-2xl font-bold text-gray-900 mb-2">Research Question 5</h2>
             <div className="mb-2">
               <span className="text-xs font-semibold text-blue-600 uppercase tracking-wide">Pie Chart</span>
+              <span className="text-xs text-gray-600 ml-3">— Team Member: abdelrahman mousa</span>
             </div>
             <h3 className="text-xl font-semibold text-gray-800 mb-6">What percentage of collisions involve each type of vehicle?</h3>
             <Plot
@@ -939,6 +858,10 @@ function VisualizationsPage() {
               config={{ displayModeBar: true, responsive: true, displaylogo: false, modeBarButtonsToRemove: ['pan2d', 'lasso2d'] }}
               style={{ width: '100%', height: '100%' }}
             />
+            <div className="findings mt-6 pt-6 border-t border-gray-200">
+              <h3 className="text-lg font-semibold text-gray-900 mb-2">Key Findings:</h3>
+              <p className="text-gray-700">Most collisions involve sedans, SUVs, and passenger vehicles, which together make up the majority of the chart. Smaller groups like taxis, pick-up trucks, vans, and buses appear much less often. This shows that the types of cars most common on the road are also the ones most involved in collisions.</p>
+            </div>
           </div>
 
           {/* QUESTION 6 (Pie Chart) */}
@@ -946,6 +869,7 @@ function VisualizationsPage() {
             <h2 className="text-2xl font-bold text-gray-900 mb-2">Research Question 6</h2>
             <div className="mb-2">
               <span className="text-xs font-semibold text-blue-600 uppercase tracking-wide">Pie Chart</span>
+              <span className="text-xs text-gray-600 ml-3">— Team Member: mohamed osama</span>
             </div>
             <h3 className="text-xl font-semibold text-gray-800 mb-6">What share does each borough contribute to total collisions?</h3>
             <Plot
@@ -958,6 +882,10 @@ function VisualizationsPage() {
               config={{ displayModeBar: true, responsive: true, displaylogo: false, modeBarButtonsToRemove: ['pan2d', 'lasso2d'] }}
               style={{ width: '100%', height: '100%' }}
             />
+            <div className="findings mt-6 pt-6 border-t border-gray-200">
+              <h3 className="text-lg font-semibold text-gray-900 mb-2">Key Findings:</h3>
+              <p className="text-gray-700">Brooklyn makes up more than half of all collisions, making it the clear leader. Queens and Manhattan follow with moderate shares, while the Bronx has a smaller part. Staten Island has the lowest share. This pattern matches the population and traffic levels of the boroughs — the more crowded the area, the more collisions happen.</p>
+            </div>
           </div>
 
           {/* QUESTION 7 (Heatmap) */}
@@ -965,6 +893,7 @@ function VisualizationsPage() {
             <h2 className="text-2xl font-bold text-gray-900 mb-2">Research Question 7</h2>
             <div className="mb-2">
               <span className="text-xs font-semibold text-blue-600 uppercase tracking-wide">Heatmap</span>
+              <span className="text-xs text-gray-600 ml-3">— Team Member: seif mohamed</span>
             </div>
             <h3 className="text-xl font-semibold text-gray-800 mb-6">At what hour and on what day of the week do collisions happen the most?</h3>
             <Plot
@@ -979,6 +908,10 @@ function VisualizationsPage() {
               config={{ displayModeBar: true, responsive: true, displaylogo: false, modeBarButtonsToRemove: ['pan2d', 'lasso2d'] }}
               style={{ width: '100%', height: '100%' }}
             />
+            <div className="findings mt-6 pt-6 border-t border-gray-200">
+              <h3 className="text-lg font-semibold text-gray-900 mb-2">Key Findings:</h3>
+              <p className="text-gray-700">Collisions are highest on weekdays during the late morning and afternoon hours, when roads are very active. Early mornings and late nights show the lowest activity. The heatmap also shows that weekends have fewer intense hotspots than weekdays. Overall, the busiest hours of the day and the middle of the week have the most collisions.</p>
+            </div>
           </div>
 
           {/* QUESTION 8 (Heatmap) */}
@@ -986,6 +919,7 @@ function VisualizationsPage() {
             <h2 className="text-2xl font-bold text-gray-900 mb-2">Research Question 8</h2>
             <div className="mb-2">
               <span className="text-xs font-semibold text-blue-600 uppercase tracking-wide">Heatmap</span>
+              <span className="text-xs text-gray-600 ml-3">— Team Member: mahmoud amr</span>
             </div>
             <h3 className="text-xl font-semibold text-gray-800 mb-6">Which combinations of vehicle type and contributing factor appear together most often?</h3>
             <Plot
@@ -1007,6 +941,10 @@ function VisualizationsPage() {
               config={{ displayModeBar: true, responsive: true, displaylogo: false, modeBarButtonsToRemove: ['pan2d', 'lasso2d'] }}
               style={{ width: '100%', height: '100%' }}
             />
+            <div className="findings mt-6 pt-6 border-t border-gray-200">
+              <h3 className="text-lg font-semibold text-gray-900 mb-2">Key Findings:</h3>
+              <p className="text-gray-700">The heatmap shows that sedans and SUVs appear most often with many of the major contributing factors, especially driver distraction, following too closely, and failure to yield. These combinations stand out more than others, meaning these vehicle types are more commonly involved in collisions linked to these behaviors. Other vehicle types show much lower counts across all factors.</p>
+            </div>
           </div>
 
           {/* QUESTION 9 (Bar Chart) */}
@@ -1014,9 +952,14 @@ function VisualizationsPage() {
             <h2 className="text-2xl font-bold text-gray-900 mb-2">Research Question 9</h2>
             <div className="mb-2">
               <span className="text-xs font-semibold text-blue-600 uppercase tracking-wide">Bar Chart</span>
+              <span className="text-xs text-gray-600 ml-3">— Team Member: ahmed walid</span>
             </div>
             <h3 className="text-xl font-semibold text-gray-800 mb-6">Where are collision hotspots located across NYC?</h3>
             <BoroughHotspotRankingChart data={boroughHotspotData} title="Collision Hotspot Ranking Across NYC"             />
+            <div className="findings mt-6 pt-6 border-t border-gray-200">
+              <h3 className="text-lg font-semibold text-gray-900 mb-2">Key Findings:</h3>
+              <p className="text-gray-700">Brooklyn has the highest number of collision hotspots by a large margin. Queens and Manhattan follow behind with much lower counts, while the Bronx and Staten Island have the fewest. This means that Brooklyn has more busy or risky areas where crashes happen more often.</p>
+            </div>
           </div>
 
           {/* QUESTION 10 (Bubble Chart) */}
@@ -1024,9 +967,14 @@ function VisualizationsPage() {
             <h2 className="text-2xl font-bold text-gray-900 mb-2">Research Question 10</h2>
             <div className="mb-2">
               <span className="text-xs font-semibold text-blue-600 uppercase tracking-wide">Bubble Chart</span>
+              <span className="text-xs text-gray-600 ml-3">— Team Member: abdelrahman mousa</span>
             </div>
             <h3 className="text-xl font-semibold text-gray-800 mb-6">Which boroughs have the highest injury and fatality locations?</h3>
             <BoroughInjuryFatalityBubbleChart data={boroughInjuryFatalityData} title="Borough Injury and Fatality Severity"             />
+            <div className="findings mt-6 pt-6 border-t border-gray-200">
+              <h3 className="text-lg font-semibold text-gray-900 mb-2">Key Findings:</h3>
+              <p className="text-gray-700">Brooklyn has the highest number of injuries and fatalities, shown by the much larger bubble. Manhattan also has some severe cases but far fewer than Brooklyn. Queens and Staten Island show very small bubbles, meaning they have much lower severe collision levels. This suggests that Brooklyn experiences the most serious crash outcomes.</p>
+            </div>
           </div>
         </div>
       </div>
