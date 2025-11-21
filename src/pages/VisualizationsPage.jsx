@@ -546,6 +546,12 @@ function VisualizationsPage() {
     }
   }
 
+  // Recompute filtered data whenever dropdown filters or raw data change
+  useEffect(() => {
+    if (!data || data.length === 0) return
+    applyFilters()
+  }, [filters, data])
+
   /**
    * Handle search query - parse and apply filters automatically
    */
